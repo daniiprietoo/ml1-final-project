@@ -1,12 +1,16 @@
 # Utils function to load and merge the data
 using CSV
 using DataFrames
+using MultivariateStats
+using Statistics
+using LinearAlgebra
+
 
 function load_and_merge_data(tracks_file::String, features_file::String; 
                              selected_tracks_columns::Union{Nothing, Vector{Symbol}} = nothing,
                              selected_features_algorithms::Union{Nothing, Vector{Symbol}} = nothing) ::DataFrame
-    tracks_df = load_tracks(tracks_file, selected_tracks_columns)
-    features_df = load_features(features_file, selected_features_algorithms)
+    tracks_df = load_tracks(tracks_file, selected_columns=selected_tracks_columns)
+    features_df = load_features(features_file; selected_algorithms=selected_features_algorithms)
     # Merge on track_id
     tracks_df.track_id = string.(tracks_df.track_id)
     features_df.track_id = string.(features_df.track_id)
@@ -77,13 +81,34 @@ function load_features(features_file::String; selected_algorithms::Union{Nothing
         selected_indices = findall(x -> Symbol(x) in selected_algorithms, rows[1])
     end
     
-    # Load features_df with header=false
-    features_df = CSV.read(features_file, DataFrame; header=false, skipto=5, select=[1; selected_indices .+ 1])
+        # Convert selected_indices to a vector to ensure proper handling
+    selected_indices_vec = collect(selected_indices)
     
-    # Create combined column names
+    # Select columns: column 1 (track_id) + feature columns
+    selected_cols = [1; selected_indices_vec .+ 1]
+    features_df = CSV.read(features_file, DataFrame; header=false, skipto=5, select=selected_cols)
+    
+    # Create combined column names based on actual columns read
+    # First column is always track_id
     combined_names = [:track_id]
-    for i in selected_indices
-        push!(combined_names, Symbol(string(rows[1][i]) * "_" * string(rows[2][i])))
+    
+    # Add names for feature columns
+    num_feature_cols = ncol(features_df) - 1
+    
+    # Only create names for the actual number of feature columns we have
+    for i in 1:min(length(selected_indices_vec), num_feature_cols)
+        idx = selected_indices_vec[i]
+        if idx <= length(rows[1]) && idx <= length(rows[2])
+            push!(combined_names, Symbol(string(rows[1][idx]) * "_" * string(rows[2][idx])))
+        else
+            # Fallback if index is out of bounds
+            push!(combined_names, Symbol("feature_$i"))
+        end
+    end
+    
+    # If we still don't have enough names, add generic ones
+    while length(combined_names) < ncol(features_df)
+        push!(combined_names, Symbol("feature_$(length(combined_names))"))
     end
     
     rename!(features_df, combined_names, makeunique=true)
