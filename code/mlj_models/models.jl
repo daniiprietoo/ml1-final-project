@@ -1,11 +1,3 @@
-import Pkg;
-
-Pkg.add("LIBSVM")
-Pkg.add("MLJLIBSVMInterface")
-Pkg.add("NearestNeighborModels")
-Pkg.add("MLJDecisionTreeInterface")
-Pkg.add("MLJ")
-
 using MLJ
 using LIBSVM
 using NearestNeighborModels

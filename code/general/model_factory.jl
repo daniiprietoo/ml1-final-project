@@ -19,14 +19,16 @@ using MLJEnsembles: EnsembleModel, CPUThreads
         maxEpochs = get(modelHyperparameters, :maxEpochs, 1000)
         validationRatio = get(modelHyperparameters, :validationRatio, 0)
         maxEpochsVal = get(modelHyperparameters, :maxEpochsVal, 20)
+        numExecutions = get(modelHyperparameters, :numExecutions, 20)
 
     
-        return ANNCrossValidation(topology, dataset, crossValidationIndices,
+        return ANNCrossValidation(topology, dataset, crossValidationIndices;
         transferFunctions=transferFunctions,
         maxEpochs=maxEpochs, 
         learningRate=learningRate,
         validationRatio=validationRatio, 
-        maxEpochsVal=maxEpochsVal)
+        maxEpochsVal=maxEpochsVal,
+        numExecutions=numExecutions)
 
 
     elseif modelType in [:SVC, :DecisionTreeClassifier, :KNeighborsClassifier]
@@ -216,7 +218,8 @@ function trainClassEnsemble(estimators::AbstractArray{Symbol, 1},
         X_test = coerce(X_test_no_coerce, autotype(X_test_no_coerce, rules = (:discrete_to_continuous,)))
         y_test = categorical(output_data[test_indexes])
 
-        base_models_NamedTuple = (; (Symbol(estimators[n]) => create_tuned_model(estimators[n], modelsHyperParameters) for n=1:length(estimators))...)
+        # Extract hyperparameters for each estimator
+        base_models_NamedTuple = (; (Symbol(estimators[n]) => create_tuned_model(estimators[n], get(modelsHyperParameters, estimators[n], Dict())) for n=1:length(estimators))...)
 
         model_bagging = Stack(; 
             metalearner = SVC(),

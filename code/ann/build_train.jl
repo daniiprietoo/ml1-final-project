@@ -1,4 +1,3 @@
-using Pkg; Pkg.add("Flux")
 using Flux;
 using Flux.Losses
 using Statistics;
@@ -138,7 +137,7 @@ function trainClassANN(topology::AbstractArray{<:Int,1},
         push!(testLosses, testLoss);
 
         # Some feedback on the screen
-        # println("Epoch ", numEpoch, ": -- Training loss ", trainingLoss, " -- Validation loss:", validationLoss, " -- Test loss ", testLoss);
+        println("Epoch ", numEpoch, ": -- Training loss ", trainingLoss, " -- Validation loss:", validationLoss, " -- Test loss ", testLoss);
 
 
         opt_state = Flux.setup(Adam(learningRate), ann);
@@ -169,9 +168,10 @@ function trainClassANN(topology::AbstractArray{<:Int,1},
             testAccuracy = accuracy(outputsTest, testTargets);
 
             #  and give some feedback on the screen
-            # println("Epoch ", numEpoch, ": -- Training loss ", trainingLoss, " -- Validation loss:", validationLoss, " -- Test loss ", testLoss);
-            # println("Epoch ", numEpoch, ": -- Training acc  ", trainingAccuracy, " -- Validation acc: ", validationAccuracy, " -- Test acc  ", testAccuracy);
-
+            if numEpoch % 100 == 0
+                println("Epoch ", numEpoch, ": -- Training loss ", trainingLoss, " -- Validation loss:", validationLoss, " -- Test loss ", testLoss);
+                println("Epoch ", numEpoch, ": -- Training acc  ", trainingAccuracy, " -- Validation acc: ", validationAccuracy, " -- Test acc  ", testAccuracy);
+            end
 
             
             if validationLoss < bestValidationLoss
@@ -207,7 +207,7 @@ end;
 function ANNCrossValidation(topology::AbstractArray{<:Int,1},
     dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{<:Any,1}},
     crossValidationIndices::Array{Int64,1};
-    numExecutions::Int=50,
+    numExecutions::Int64=50,
     transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology)),
     maxEpochs::Int=1000, minLoss::Real=0.0, learningRate::Real=0.01,
     validationRatio::Real=0, maxEpochsVal::Int=20)
@@ -233,7 +233,7 @@ function ANNCrossValidation(topology::AbstractArray{<:Int,1},
   ppv = []
   npv = []
   f1 = []
-  confusion_matrix = zeros(Float64, numClasses, numClasses)
+  confusion_matrix = zeros(Float32, numClasses, numClasses)
   
   
     for k in 1:numFolds
@@ -241,7 +241,7 @@ function ANNCrossValidation(topology::AbstractArray{<:Int,1},
       println("Fold ", k," of ", numFolds)
   
       #Initialize confusion matrix and metrics vectors
-      all_confusion_matrices = zeros(Float64, numClasses, numClasses, numExecutions)
+      all_confusion_matrices = zeros(Float32, numClasses, numClasses, numExecutions)
   
       accuracy_fold_k = []
       error_rate_fold_k = []
