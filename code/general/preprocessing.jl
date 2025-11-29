@@ -1,9 +1,7 @@
-# ...existing code...
-
+# Utils function to load and merge the data
 using CSV
 using DataFrames
 
-# Utils function to load and merge the data
 function load_and_merge_data(tracks_file::String, features_file::String; 
                              selected_tracks_columns::Union{Nothing, Vector{Symbol}} = nothing,
                              selected_features_algorithms::Union{Nothing, Vector{Symbol}} = nothing) ::DataFrame
