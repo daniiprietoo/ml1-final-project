@@ -1,0 +1,30 @@
+using Pkg
+Pkg.add([
+    "MLJ", 
+    "MLJBase", 
+    "MLJModels", 
+    "MLJEnsembles", 
+    "MLJLinearModels", 
+    "DecisionTree", 
+    "MLJDecisionTreeInterface",
+    "NaiveBayes",
+    "MLJNaiveBayesInterface", 
+    "EvoTrees", 
+    "CategoricalArrays", 
+    "Random",
+    "LIBSVM",           
+    "MLJLIBSVMInterface", 
+    "Plots",            
+    "MLJModelInterface", 
+    "CSV",              
+    "DataFrames",       
+    "UrlDownload",      
+    "XGBoost",
+    "MLJMultivariateStatsInterface",
+    "CatBoost",
+    "Statistics",
+    "LinearAlgebra",
+    "NearestNeighborModels"
+])
+
+Pkg.update()
