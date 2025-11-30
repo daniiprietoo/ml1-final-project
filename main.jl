@@ -17,6 +17,7 @@ include("code/ann/build_train.jl")
 include("code/mlj_models/train_mlj.jl")
 include("code/mlj_models/models.jl")
 
+
 println("=" ^ 80)
 println("Random seed set to: $RANDOM_SEED for reproducibility")
 println()
@@ -103,7 +104,8 @@ println()
 
 # ANN Configurations (at least 8 different architectures, 1-2 hidden layers)
 ann_configs = [
-    Dict(:topology => [10], :learningRate => 0.01, :maxEpochs => 1000, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 3),
+    Dict(:topology => [10], :learningRate => 0.01, :maxEpochs => 1000, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 3)
+    #=
     Dict(:topology => [20], :learningRate => 0.01, :maxEpochs => 1000, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 3),
     Dict(:topology => [30], :learningRate => 0.01, :maxEpochs => 1000, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 3),
     Dict(:topology => [50], :learningRate => 0.01, :maxEpochs => 1000, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 3),
@@ -111,11 +113,14 @@ ann_configs = [
     Dict(:topology => [20, 10], :learningRate => 0.01, :maxEpochs => 1000, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 3),
     Dict(:topology => [30, 15], :learningRate => 0.01, :maxEpochs => 1000, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 3),
     Dict(:topology => [50, 25], :learningRate => 0.01, :maxEpochs => 1000, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 3),
+    =#
 ]
 
 # SVM Configurations (at least 8 different configurations: kernels + C values)
 svm_configs = [
-    Dict(:kernel => "linear", :cost => 0.1),
+    
+    Dict(:kernel => "linear", :cost => 0.1)
+    #=
     Dict(:kernel => "linear", :cost => 1.0),
     Dict(:kernel => "rbf", :cost => 0.1, :gamma => 0.01),
     Dict(:kernel => "rbf", :cost => 1.0, :gamma => 0.01),
@@ -123,6 +128,7 @@ svm_configs = [
     Dict(:kernel => "poly", :cost => 1.0, :gamma => 0.01, :degree => 2),
     Dict(:kernel => "poly", :cost => 1.0, :gamma => 0.01, :degree => 3),
     Dict(:kernel => "sigmoid", :cost => 1.0, :gamma => 0.01, :coef0 => 0.0),
+    =#
 ]
 
 # Decision Tree Configurations (at least 6 different depth values)
@@ -185,6 +191,10 @@ function run_approach_experiments(approach_name::String,
     # Normalize test data using training parameters
     test_inputs_norm = normalizeMinMax(test_inputs, norm_params)
     
+    if (approach_name == "PCA")
+        train_inputs = pcaToMatrix(train_inputs)
+    end
+
     # Prepare dataset tuple
     train_inputs_f32 = Float32.(train_inputs)
     dataset = (train_inputs_f32, train_targets)
@@ -230,6 +240,7 @@ function run_approach_experiments(approach_name::String,
             results[4][1]  # Mean Specificity
         ))
     end
+    
 
     
     
@@ -277,6 +288,7 @@ function run_approach_experiments(approach_name::String,
         ))
     end
     
+    
     # Test kNN
     println("\nTesting kNN configurations...")
     for (i, config) in enumerate(knn_configs)
@@ -300,11 +312,11 @@ function run_approach_experiments(approach_name::String,
     end
     
     println("\n--- Best configurations found ---")
-    println("  Best ANN: $(best_ann[:topology]) - Accuracy: $(round(best_ann_acc, digits=4))")
-    println("  Best SVM: $(best_svm[:kernel]) (cost=$(best_svm[:cost])) - Accuracy: $(round(best_svm_acc, digits=4))")
-    println("  Best DT: max_depth=$(best_dt[:max_depth]) - Accuracy: $(round(best_dt_acc, digits=4))")
+    #println("  Best ANN: $(best_ann[:topology]) - Accuracy: $(round(best_ann_acc, digits=4))")
+    #println("  Best SVM: $(best_svm[:kernel]) (cost=$(best_svm[:cost])) - Accuracy: $(round(best_svm_acc, digits=4))")
+    #println("  Best DT: max_depth=$(best_dt[:max_depth]) - Accuracy: $(round(best_dt_acc, digits=4))")
     println("  Best kNN: k=$(best_knn[:n_neighbors]) - Accuracy: $(round(best_knn_acc, digits=4))")
-    
+    #=
     # ========================================================================
     # ENSEMBLE TRAINING
     # ========================================================================
@@ -352,6 +364,7 @@ function run_approach_experiments(approach_name::String,
         results[3][1], # Mean Sensitivity
         results[4][1]  # Mean Specificity
     ))
+    =#
     
     return (results_df, Dict(
         :best_ann => best_ann,
@@ -376,6 +389,19 @@ results_df, best_configs = run_approach_experiments(
 )
 
 
+
+
+results_df_pca, best_configs_pca = run_approach_experiments(
+    "PCA",
+    configs,
+    copy(train_inputs),
+    copy(train_targets),
+    copy(test_inputs),
+    copy(test_targets),
+    3
+)
+
+
 # ============================================================================
 # FINAL SUMMARY
 # ============================================================================
@@ -390,6 +416,16 @@ println("=" ^ 80)
 println(results_df)
 println("=" ^ 80)
 println("Best Configurations - All features")
+println(best_configs)
+println("=" ^ 80)
+
+println("\n" * "=" ^ 80)
+println("SUMMARY - PCA")
+println("=" ^ 80)
+println(results_df_pca)
+println("=" ^ 80)
+println("Best Configurations - PCA")
+println(best_configs_pca)
 println("=" ^ 80)
 
 println("\n" * "=" ^ 80)

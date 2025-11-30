@@ -1,4 +1,5 @@
 using Random;
+include("../mlj_models/models.jl")
 
 function holdOut(N::Int, P::Float64, rng::AbstractRNG=Random.default_rng())
 
@@ -206,3 +207,18 @@ function classifyOutputs(outputs::AbstractArray{<:Real,2};
         return outputs;
     end;
 end;
+
+function pcaToMatrix(train_inputs::Matrix{Float64})
+    pca_model = getPCA()
+    pca_mach = machine(pca_model, MLJ.table(train_inputs))
+    MLJ.fit!(pca_mach)
+
+    # Transform the data
+    pca_train = MLJ.transform(pca_mach, MLJ.table(train_inputs))
+    #pca_test = MLJ.transform(pca_mach, MLJ.table(test_inputs))
+    subarrays = values(pca_train)
+    matrix_result = hcat(map(subarray -> transpose(Matrix(transpose(subarray))), subarrays)...)
+    return matrix_result
+end
+
+
