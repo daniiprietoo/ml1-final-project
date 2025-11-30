@@ -10,37 +10,6 @@ include("../../code/ann/build_train.jl")
 include("../../code/mlj_models/train_mlj.jl")
 include("../../code/mlj_models/models.jl")
 
-"""
-    run_approach_experiments(approach_name, model_configs, train_inputs, train_targets, 
-                            test_inputs, test_targets; kwargs...)
-
-Run experiments for a given approach with configurable models and preprocessing.
-
-# Arguments
-- `approach_name::String`: Name of the approach (e.g., "Full Features", "PCA Reduced")
-- `model_configs::Dict`: Dictionary mapping model types to their configurations
-  - Keys: `:ANN`, `:SVM`, `:DT`, `:KNN`, `:RF`, `:AdaBoost`, `:CatBoost`
-  - Values: Arrays of configuration dictionaries
-- `train_inputs::Matrix{Float64}`: Training input features
-- `train_targets::Vector{String}`: Training target labels
-- `test_inputs::Matrix{Float64}`: Test input features  
-- `test_targets::Vector{String}`: Test target labels
-
-# Keyword Arguments
-- `k_folds::Int=5`: Number of folds for cross-validation
-- `rng::AbstractRNG`: Random number generator
-- `normalize::Bool=true`: Whether to normalize features
-- `preprocessing::Union{Nothing, Dict}=nothing`: Preprocessing configuration
-  - `:type => :PCA` or `:LDA`
-  - `:n_components => Int`: Number of components to keep
-  - `:apply_to_test::Bool=true`: Whether to apply preprocessing to test set
-
-# Returns
-- `results_df::DataFrame`: Results for all model configurations
-- `best_configs::Dict`: Best configuration for each model type
-"""
-
-
 function run_approach_experiments(
     approach_name::String,
     model_configs::Dict,
@@ -71,15 +40,24 @@ function run_approach_experiments(
     train_inputs_processed = copy(train_inputs)
     test_inputs_processed = copy(test_inputs)
     preprocessing_model = nothing
+
+    # Normalize training data
+    if normalize
+        norm_params = calculateMinMaxNormalizationParameters(train_inputs_processed)
+        normalizeMinMax!(train_inputs_processed)
+        
+        # Normalize test data using training parameters
+        test_inputs_processed = normalizeMinMax(test_inputs_processed, norm_params)
+    end
     
     if preprocessing !== nothing
         println("\n--- Applying preprocessing: $(preprocessing[:type]) ---")
         if preprocessing[:type] == :PCA
-            n_components = get(preprocessing, :n_components, nothing)
+            maxoutdim = get(preprocessing, :maxoutdim, nothing)
             variance_ratio = get(preprocessing, :variance_ratio, nothing)
             train_inputs_processed, preprocessing_mach = apply_pca_mlj(
-                train_inputs; 
-                n_components=n_components, 
+                train_inputs_processed; 
+                maxoutdim=maxoutdim, 
                 variance_ratio=variance_ratio
             )
             if get(preprocessing, :apply_to_test, true)
@@ -89,7 +67,7 @@ function run_approach_experiments(
         elseif preprocessing[:type] == :LDA
             n_components = get(preprocessing, :outdim, nothing)
             train_inputs_processed, preprocessing_mach = apply_lda_mlj(
-                train_inputs,
+                train_inputs_processed,
                 train_targets;
                 outdim=outdim
             )
@@ -99,15 +77,7 @@ function run_approach_experiments(
             println("  Reduced from $(size(train_inputs, 2)) to $(size(train_inputs_processed, 2)) features")
         end
     end
-    
-    # Normalize training data
-    if normalize
-        normalizeMinMax!(train_inputs_processed)
-        norm_params = calculateMinMaxNormalizationParameters(train_inputs_processed)
-        
-        # Normalize test data using training parameters
-        test_inputs_processed = normalizeMinMax(test_inputs_processed, norm_params)
-    end
+
     
     # Prepare dataset tuple
     train_inputs_f32 = Float32.(train_inputs_processed)
@@ -311,9 +281,7 @@ function run_approach_experiments(
     # ========================================================================
     # ENSEMBLE TRAINING
     # ========================================================================
-    
-    println("\n--- Training ensemble model (combining best models) ---")
-    
+        
     # Select best models for ensemble (at least 2, up to 3)
     println("\n--- Training ensemble model (combining best models) ---")
     
@@ -340,9 +308,6 @@ function run_approach_experiments(
         )
         ensemble_estimators = [model_type_map[c[1]] for c in ensemble_candidates[1:num_ensemble]]
         
-        # Prepare training data for ensemble (needs Bool array)
-        classes = unique(train_targets)
-        train_targets_bool = oneHotEncoding(train_targets, classes)
         
         # Build hyperparameters dict
         ensemble_hyperparams = Dict()
@@ -358,7 +323,7 @@ function run_approach_experiments(
             ensemble_estimators,
             ensemble_hyperparams,
             ensemble_config,
-            (train_inputs_processed, train_targets_bool),
+            (train_inputs_f32, train_targets),
             cv_indices
         )
         

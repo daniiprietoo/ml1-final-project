@@ -4,6 +4,7 @@ using DataFrames
 using MultivariateStats
 using Statistics
 using LinearAlgebra
+using MLJ
 
 PCA = @load PCA pkg=MultivariateStats
 LDA = @load LDA pkg=MultivariateStats
@@ -147,15 +148,15 @@ function getLDAModel(modelHyperparameters::Dict)
     return LDA()  
 end
 
-function apply_pca_mlj(data::AbstractArray{<:Real,2}; n_components::Union{Int, Nothing}=nothing, variance_ratio::Union{Float64, Nothing}=nothing)
+function apply_pca_mlj(data::AbstractArray{<:Real,2}; maxoutdim::Union{Int, Nothing}=nothing, variance_ratio::Union{Float64, Nothing}=nothing)
     # Convert to MLJ table format
     data_table = MLJ.table(data)
     
     # Create PCA model
     if variance_ratio !== nothing
         pca_model = getPCAModel(Dict(:variance_ratio => variance_ratio))
-    elseif n_components !== nothing
-        pca_model = getPCAModel(Dict(:maxoutdim => n_components))
+    elseif maxoutdim !== nothing
+        pca_model = getPCAModel(Dict(:maxoutdim => maxoutdim))
     else
         error("Either n_components or variance_ratio must be specified")
     end
@@ -165,7 +166,7 @@ function apply_pca_mlj(data::AbstractArray{<:Real,2}; n_components::Union{Int, N
     transformed_table = MLJ.transform(pca_mach, data_table)
     
     # Convert back to matrix
-    transformed_data = Matrix(transformed_table)
+    transformed_data = MLJ.matrix(transformed_table)
     
     return transformed_data, pca_mach
 end
@@ -173,7 +174,7 @@ end
 function transform_pca_mlj(pca_mach, data::AbstractArray{<:Real,2})
     data_table = MLJ.table(data)
     transformed_table = MLJ.transform(pca_mach, data_table)
-    return Matrix(transformed_table)
+    return MLJ.matrix(transformed_table)
 end
 
 function apply_lda_mlj(data::AbstractArray{<:Real,2}, labels::Vector{String}; outdim::Union{Int, Nothing}=nothing)
