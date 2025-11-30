@@ -1,6 +1,7 @@
 ## Model cross validation
 include("../mlj_models/train_mlj.jl")
 include("../ann/build_train.jl")
+include("../mlj_models/models.jl")
 using MLJEnsembles: EnsembleModel, CPUThreads
 
 
@@ -31,7 +32,7 @@ using MLJEnsembles: EnsembleModel, CPUThreads
         numExecutions=numExecutions)
 
 
-    elseif modelType in [:SVC, :DecisionTreeClassifier, :KNeighborsClassifier]
+    elseif modelType in [:SVC, :DecisionTreeClassifier, :KNeighborsClassifier, :RandomForestClassifier, :AdaBoostClassifier, :CatBoostClassifier]
         # Los modelos de MLJ son deterministas, usamos la nueva función
         return mljCrossValidation(modelType, modelHyperparameters, dataset, crossValidationIndices)
     else
@@ -168,10 +169,17 @@ function create_tuned_model(estimator_symbol::Symbol, modelsHyperParameters::Dic
         )
     )
 
-    base_model = getModel(estimator_symbol, modelsHyperParameters)
+    # For SVC in ensembles, use probabilistic version
+    if estimator_symbol == :SVC
+        base_model = getSVCProbabilisticModel(modelsHyperParameters)
+    else
+        base_model = getModel(estimator_symbol, modelsHyperParameters)
+    end
 
     if haskey(tuning_params_dict, estimator_symbol)
         println("Creando TunedModel para $estimator_symbol...")
+
+        
         
         tuning_params = tuning_params_dict[estimator_symbol]
 

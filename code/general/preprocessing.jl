@@ -5,6 +5,8 @@ using MultivariateStats
 using Statistics
 using LinearAlgebra
 
+PCA = @load PCA pkg=MultivariateStats
+LDA = @load LDA pkg=MultivariateStats
 
 function load_and_merge_data(tracks_file::String, features_file::String; 
                              selected_tracks_columns::Union{Nothing, Vector{Symbol}} = nothing,
@@ -122,4 +124,82 @@ end
 
 # To load specific tracks columns and features algorithms:
 # df_final = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens, :duration], selected_features_algorithms=[:mfcc, :chroma])
+
+function getPCAModel(modelHyperparameters::Dict) 
+    if haskey(modelHyperparameters, :variance_ratio) && !isempty(modelHyperparameters[:variance_ratio])
+        variance_ratio = get(modelHyperparameters, :variance_ratio, 0.95)
+        return PCA(variance_ratio=variance_ratio)
+    elseif haskey(modelHyperparameters, :maxoutdim) && !isempty(modelHyperparameters[:maxoutdim])
+        maxoutdim = get(modelHyperparameters, :maxoutdim, 25)
+        return PCA(maxoutdim=maxoutdim)
+    else
+        error("PCA accepts either `variance_ratio` or `maxoutdim`")
+    end
+        
+end
+
+function getLDAModel(modelHyperparameters::Dict) 
+    if haskey(modelHyperparameters, :outdim) && !isempty(modelHyperparameters[:variance_ratio])
+        outdim = get(modelHyperparameters, :outdim, 2)
+        return LDA(outdim=outdim)
+    end
+    
+    return LDA()  
+end
+
+function apply_pca_mlj(data::AbstractArray{<:Real,2}; n_components::Union{Int, Nothing}=nothing, variance_ratio::Union{Float64, Nothing}=nothing)
+    # Convert to MLJ table format
+    data_table = MLJ.table(data)
+    
+    # Create PCA model
+    if variance_ratio !== nothing
+        pca_model = getPCAModel(Dict(:variance_ratio => variance_ratio))
+    elseif n_components !== nothing
+        pca_model = getPCAModel(Dict(:maxoutdim => n_components))
+    else
+        error("Either n_components or variance_ratio must be specified")
+    end
+    
+    # Fit and transform
+    pca_mach = machine(pca_model, data_table) |> MLJ.fit!
+    transformed_table = MLJ.transform(pca_mach, data_table)
+    
+    # Convert back to matrix
+    transformed_data = Matrix(transformed_table)
+    
+    return transformed_data, pca_mach
+end
+
+function transform_pca_mlj(pca_mach, data::AbstractArray{<:Real,2})
+    data_table = MLJ.table(data)
+    transformed_table = MLJ.transform(pca_mach, data_table)
+    return Matrix(transformed_table)
+end
+
+function apply_lda_mlj(data::AbstractArray{<:Real,2}, labels::Vector{String}; outdim::Union{Int, Nothing}=nothing)
+    # Convert to MLJ table format
+    data_table = MLJ.table(data)
+    labels_categorical = categorical(labels)
+    
+    # Create LDA model
+    if outdim !== nothing
+        lda_model = getLDAModel(Dict(:outdim => outdim))
+    else 
+        lad_model = getLDAModel()
+    end
+    # Fit and transform
+    lda_mach = machine(lda_model, data_table, labels_categorical) |> MLJ.fit!
+    transformed_table = MLJ.transform(lda_mach, data_table)
+    
+    # Convert back to matrix
+    transformed_data = Matrix(transformed_table)
+    
+    return transformed_data, lda_mach
+end
+
+function transform_lda_mlj(lda_mach, data::AbstractArray{<:Real,2})
+    data_table = MLJ.table(data)
+    transformed_table = MLJ.transform(lda_mach, data_table)
+    return Matrix(transformed_table)
+end
 

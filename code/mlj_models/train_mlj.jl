@@ -46,6 +46,12 @@ function mljCrossValidation(
             model = getDecisionTreeModel(modelHyperparameters)
         elseif modelType == :KNeighborsClassifier
             model = getkNNModel(modelHyperparameters)
+        elseif modelType == :RandomForestClassifier
+            model = getRandomForestModel(modelHyperparameters)
+        elseif modelType == :AdaBoostClassifier
+            model = getAdaBoostModel(modelHyperparameters)
+        elseif modelType == :CatBoostClassifier
+            model = getCatBoostModel(modelHyperparameters)
         else
             error("Tipo de modelo no soportado: ", modelType)
         end
