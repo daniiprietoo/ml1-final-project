@@ -30,7 +30,10 @@ function run_approach_experiments(
         Accuracy = Float64[],
         ErrorRate = Float64[],
         Sensitivity = Float64[],
-        Specificity = Float64[]
+        Specificity = Float64[],
+        PPV = Float64[],
+        NPV = Float64[],
+        F1 = Float64[],
     )
 
     println("=" ^ 80)
