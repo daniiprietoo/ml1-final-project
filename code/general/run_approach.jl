@@ -65,7 +65,7 @@ function run_approach_experiments(
             end
             println("  Reduced from $(size(train_inputs, 2)) to $(size(train_inputs_processed, 2)) features")
         elseif preprocessing[:type] == :LDA
-            n_components = get(preprocessing, :outdim, nothing)
+            outdim = get(preprocessing, :outdim, nothing)
             train_inputs_processed, preprocessing_mach = apply_lda_mlj(
                 train_inputs_processed,
                 train_targets;
@@ -344,4 +344,18 @@ function run_approach_experiments(
     end
     
     return (results_df, best_configs, preprocessing_model)
+end
+
+
+function save_results_to_csv(results_df::DataFrame, filepath::String)
+    # 1. Create directory if it doesn't exist (e.g., if you save to "results/my_file.csv")
+    dir_path = dirname(filepath)
+    if !isempty(dir_path) && !isdir(dir_path)
+        mkpath(dir_path)
+        println("Created directory: $dir_path")
+    end
+
+    # 2. Write the DataFrame to CSV
+    CSV.write(filepath, results_df)
+    println("✅ Results successfully saved to: $filepath")
 end

@@ -44,8 +44,8 @@ end
 """
 Load and prepare the tracks and features datasets
 """
-function load_datasets(tracks_path="data/tracks.csv", 
-                       features_path="data/features.csv")
+function load_datasets(tracks_path="../data/tracks.csv", 
+                       features_path="../data/features.csv")
     println("\n=== Loading Datasets ===")
     
     # Load tracks with multi-level column structure
@@ -285,7 +285,7 @@ function analyze_engagement(tracks::DataFrame)
     println("="^80)
     
     # Search for engagement columns
-    engagement_patterns = ["listens", "favorites", "comments", "interest"]
+    engagement_patterns = ["track_listens", "track_favorites", "track_comments", "track_interest"]
     found_metrics = Dict{String, String}()
     
     for pattern in engagement_patterns

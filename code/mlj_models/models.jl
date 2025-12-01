@@ -96,8 +96,9 @@ end
 
 function getDecisionTreeModel(modelHyperparameters::Dict)
     max_depth = get(modelHyperparameters, :max_depth, 5)
+    min_samples_leaf = get(modelHyperparameters, :min_samples_leaf, 1)
     rng = get(modelHyperparameters, :rng, Random.MersenneTwister(1))
-    return DTClassifier(max_depth=max_depth, rng=rng)
+    return DTClassifier(max_depth=max_depth, min_samples_leaf=min_samples_leaf, rng=rng)
 end
 function getDecisionTreeModelRegressor(modelHyperparameters::Dict)
     max_depth=get(modelHyperparameters, :max_depth, 5)

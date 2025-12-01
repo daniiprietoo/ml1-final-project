@@ -7,18 +7,12 @@ using Flux
 const RANDOM_SEED = 1234
 Random.seed!(RANDOM_SEED)
 const rng = MersenneTwister(RANDOM_SEED)
+MLJ.default_resource(CPUProcesses())
 
 # Include all necessary modules
 include("code/general/preprocessing.jl")
-include("code/general/utils_general.jl")
-include("code/general/train_metrics.jl")
-include("code/general/model_factory.jl")
-include("code/ann/build_train.jl")
-include("code/mlj_models/train_mlj.jl")
-include("code/mlj_models/models.jl")
-
 include("code/general/run_approach.jl")
-
+include("code/general/utils_plot.jl")
 println("=" ^ 80)
 println("Random seed set to: $RANDOM_SEED for reproducibility")
 println()
@@ -57,7 +51,7 @@ println("  High: $(sum(targets .== "High"))")
 println()
 
 # Extract feature columns (exclude track_id and listens)
-feature_cols = [col for col in names(df) if col != :track_id && col != :track_listens]
+feature_cols = [col for col in names(df) if col != "track_listens" && col != "track_id"]
 features_df = select(df, feature_cols)
 
 # Check for and handle non-numeric columns
@@ -147,12 +141,34 @@ knn_configs = [
     Dict(:n_neighbors => 10),
     Dict(:n_neighbors => 15),
 ]
+rf_configs = [
+    # Dict(:n_trees => 50, :max_depth => 5, :rng => rng),
+    # Dict(:n_trees => 100, :max_depth => 10, :rng => rng),
+    Dict(:n_trees => 200, :max_depth => 15, :rng => rng),
+    Dict(:n_trees => 100, :max_depth => -1, :rng => rng),
+]
+
+adaboost_configs = [
+    # Dict(:n_estimators => 25, :learning_rate => 0.5, :rng => rng),
+    # Dict(:n_estimators => 50, :learning_rate => 1.0, :rng => rng),
+    Dict(:n_estimators => 100, :learning_rate => 1.0, :rng => rng),
+    Dict(:n_estimators => 50, :learning_rate => 1.5, :rng => rng),
+]
+
+catboost_configs = [
+    # Dict(:iterations => 50, :learning_rate => 0.1, :depth => 4),
+    # Dict(:iterations => 100, :learning_rate => 0.1, :depth => 6),
+    Dict(:iterations => 200, :learning_rate => 0.05, :depth => 8),
+]
 
 configs = Dict(
     :ANN => ann_configs,
     :SVM => svm_configs,
     :DT => dt_configs,
-    :KNN => knn_configs
+    :KNN => knn_configs,
+    :RF => rf_configs,
+    :AdaBoost => adaboost_configs,
+    :CatBoost => catboost_configs
 )
 
 # ============================================================================
@@ -169,6 +185,17 @@ results_df, best_configs = run_approach_experiments(
     k_folds=3,
     rng=rng,
 )
+println("\n" * "=" ^ 80)
+println("SUMMARY - All features")
+println("=" ^ 80)
+println(results_df)
+println("=" ^ 80)
+println("Best Configurations - All features")
+println(best_configs)
+println("=" ^ 80)
+plot_grouped_comparison(results_df; title_str="Best Model Performance (Full): Accuracy vs F1")
+plot_tradeoff_scatter(results_df; title_str="Full Features: Trade-off Analysis")
+save_results_to_csv(results_df, "results/full_dataset.csv")
 
 
 results_df_pca, best_configs_pca = run_approach_experiments(
@@ -180,26 +207,9 @@ results_df_pca, best_configs_pca = run_approach_experiments(
     copy(test_targets),
     k_folds=3,
     rng=rng,
-    preprocessing=Dict(:type => :PCA, :maxoutdim => 0.97)
+    preprocessing=Dict(:type => :PCA, :variance_ratio => 0.95)
 )
 
-
-# ============================================================================
-# FINAL SUMMARY
-# ============================================================================
-
-println("\n" * "=" ^ 80)
-println("FINAL SUMMARY - All Approaches")
-println("=" ^ 80)
-
-println("\n" * "=" ^ 80)
-println("SUMMARY - All features")
-println("=" ^ 80)
-println(results_df)
-println("=" ^ 80)
-println("Best Configurations - All features")
-println(best_configs)
-println("=" ^ 80)
 
 println("\n" * "=" ^ 80)
 println("SUMMARY - PCA")
@@ -209,6 +219,34 @@ println("=" ^ 80)
 println("Best Configurations - PCA")
 println(best_configs_pca)
 println("=" ^ 80)
+plot_grouped_comparison(results_df_pca; title_str="Best Model Performance (PCA): Accuracy vs F1")
+plot_tradeoff_scatter(results_df_pca; title_str="PCA Approach: Trade-off Analysis")
+save_results_to_csv(results_df, "results/pca.csv")
+
+results_df_lda, best_configs_lda = run_approach_experiments(
+    "LDA",
+    configs,
+    copy(train_inputs),
+    copy(train_targets),
+    copy(test_inputs),
+    copy(test_targets),
+    k_folds=3,
+    rng=rng,
+    preprocessing=Dict(:type => :LDA, :outdim => 2)
+)
+
+println("\n" * "=" ^ 80)
+println("SUMMARY - LDA")
+println("=" ^ 80)
+println(results_df_lda)
+println("=" ^ 80)
+println("Best Configurations - LDA")
+println(best_configs_lda)
+println("=" ^ 80)
+plot_grouped_comparison(results_df_lda; title_str="Best Model Performance (LDA): Accuracy vs F1")
+plot_tradeoff_scatter(results_df_lda; title_str="LDA Approach: Trade-off Analysis")
+save_results_to_csv(results_df, "results/lda.csv")
+
 
 println("\n" * "=" ^ 80)
 println("Pipeline completed successfully!")
