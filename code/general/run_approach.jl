@@ -177,9 +177,12 @@ function run_approach_experiments(
                 :DT,
                 string(config),
                 results[1][1],
-                results[7][1],
+                results[2][1],
                 results[3][1],
-                results[4][1]
+                results[4][1],
+                results[5][1],
+                results[6][1],
+                results[7][1]
             ))
         end
     end
@@ -304,69 +307,69 @@ function run_approach_experiments(
     # ENSEMBLE TRAINING
     # ========================================================================
         
-    # Select best models for ensemble (at least 2, up to 3)
-    println("\n--- Training ensemble model (combining best models) ---")
+    # # Select best models for ensemble (at least 2, up to 3)
+    # println("\n--- Training ensemble model (combining best models) ---")
     
-    # Select best models for ensemble - only DTs, SVMs, and KNNs
-    available_models = [:SVM, :DT, :KNN]
-    ensemble_candidates = [(model_type, best_configs[model_type], best_accs[model_type]) 
-                          for model_type in available_models 
-                          if haskey(best_configs, model_type) && best_configs[model_type] !== nothing]
+    # # Select best models for ensemble - only DTs, SVMs, and KNNs
+    # available_models = [:SVM, :DT, :KNN]
+    # ensemble_candidates = [(model_type, best_configs[model_type], best_accs[model_type]) 
+    #                       for model_type in available_models 
+    #                       if haskey(best_configs, model_type) && best_configs[model_type] !== nothing]
     
-    # Sort by accuracy and take all available (up to 3)
-    sort!(ensemble_candidates, by=x -> x[3], rev=true)
-    num_ensemble = length(ensemble_candidates)
+    # # Sort by accuracy and take all available (up to 3)
+    # sort!(ensemble_candidates, by=x -> x[3], rev=true)
+    # num_ensemble = length(ensemble_candidates)
     
-    if num_ensemble >= 2
-        ensemble_estimators = [Symbol(string(c[1]) * "Classifier") for c in ensemble_candidates[1:num_ensemble]]
-        # Map model types to their MLJ symbol names
-        model_type_map = Dict(
-            :SVM => :SVC,
-            :DT => :DecisionTreeClassifier,
-            :KNN => :KNeighborsClassifier,
-            :RF => :RandomForestClassifier,
-            :AdaBoost => :AdaBoostClassifier,
-            :CatBoost => :CatBoostClassifier
-        )
-        ensemble_estimators = [model_type_map[c[1]] for c in ensemble_candidates[1:num_ensemble]]
+    # if num_ensemble >= 2
+    #     ensemble_estimators = [Symbol(string(c[1]) * "Classifier") for c in ensemble_candidates[1:num_ensemble]]
+    #     # Map model types to their MLJ symbol names
+    #     model_type_map = Dict(
+    #         :SVM => :SVC,
+    #         :DT => :DecisionTreeClassifier,
+    #         :KNN => :KNeighborsClassifier,
+    #         :RF => :RandomForestClassifier,
+    #         :AdaBoost => :AdaBoostClassifier,
+    #         :CatBoost => :CatBoostClassifier
+    #     )
+    #     ensemble_estimators = [model_type_map[c[1]] for c in ensemble_candidates[1:num_ensemble]]
         
         
-        # Build hyperparameters dict
-        ensemble_hyperparams = Dict()
-        for (model_type, config, _) in ensemble_candidates[1:num_ensemble]
-            mlj_symbol = model_type_map[model_type]
-            ensemble_hyperparams[mlj_symbol] = config
-        end
+    #     # Build hyperparameters dict
+    #     ensemble_hyperparams = Dict()
+    #     for (model_type, config, _) in ensemble_candidates[1:num_ensemble]
+    #         mlj_symbol = model_type_map[model_type]
+    #         ensemble_hyperparams[mlj_symbol] = config
+    #     end
         
-        ensemble_config = Dict(:rng => rng)
+    #     ensemble_config = Dict(:rng => rng)
         
-        println("Training Stack ensemble with $num_ensemble models: $(ensemble_estimators)...")
-        ensemble_results = trainClassEnsemble(
-            ensemble_estimators,
-            ensemble_hyperparams,
-            ensemble_config,
-            (train_inputs_f32, train_targets),
-            cv_indices
-        )
+    #     println("Training Stack ensemble with $num_ensemble models: $(ensemble_estimators)...")
+    #     ensemble_results = trainClassEnsemble(
+    #         ensemble_estimators,
+    #         ensemble_hyperparams,
+    #         ensemble_config,
+    #         (train_inputs_f32, train_targets),
+    #         cv_indices
+    #     )
         
-        println("Ensemble Results:")
-        println("  Accuracy: $(round(ensemble_results[1][1], digits=4)) ± $(round(ensemble_results[1][2], digits=4))")
-        println("  F1-Score: $(round(ensemble_results[7][1], digits=4)) ± $(round(ensemble_results[7][2], digits=4))")
-        push!(results_df, (
-            approach_name,
-            :Stack,
-            string(Dict(:ensemble => ensemble_config, :models => ensemble_hyperparams)),
-#         ensemble_results[1][1],
-#         ensemble_results[2][1],
-#         ensemble_results[3][1],
-#         ensemble_results[4][1],
+    #     println("Ensemble Results:")
+    #     println("  Accuracy: $(round(ensemble_results[1][1], digits=4)) ± $(round(ensemble_results[1][2], digits=4))")
+    #     println("  F1-Score: $(round(ensemble_results[7][1], digits=4)) ± $(round(ensemble_results[7][2], digits=4))")
+    #     push!(results_df, (
+    #         approach_name,
+    #         :Stack,
+    #         string(Dict(:ensemble => ensemble_config, :models => ensemble_hyperparams)),
+    #         ensemble_results[1][1],
+    #         ensemble_results[2][1],
+    #         ensemble_results[3][1],
+    #         ensemble_results[4][1],
     #         ensemble_results[5][1],
     #         ensemble_results[6][1],
     #         ensemble_results[7][1]
-    #             ))
-    else
-        println("  Not enough models for ensemble (need at least 2)")
-    end
+    #     ))
+    # else
+    #     println("  Not enough models for ensemble (need at least 2)")
+    # end
     
     return (results_df, best_configs, preprocessing_model)
 end
