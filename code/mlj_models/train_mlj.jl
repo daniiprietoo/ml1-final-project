@@ -1,6 +1,8 @@
 include("./models.jl")
 using Statistics
 using MLJ
+using DataFrames
+using CategoricalArrays
 
 
 function mljCrossValidation(
