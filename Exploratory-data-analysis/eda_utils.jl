@@ -1,6 +1,4 @@
-### Fixed utility functions for FMA Dataset EDA
-### Adapted to work with multi-level CSV column headers
-
+### EDA Utilities for Music Track Dataset
 using CSV
 using DataFrames
 using Statistics
@@ -38,14 +36,81 @@ function find_columns(df::DataFrame, pattern::String)
 end
 
 #%% ============================================================================
+# DATA CLEANING HELPERS
+# ==============================================================================
+
+"""
+Extract numeric values from a column, handling missing and invalid data
+"""
+function extract_numeric_values(df::DataFrame, col::String)
+    if !(col in names(df))
+        return Float64[]
+    end
+    
+    values = collect(skipmissing(df[!, col]))
+    return filter(x -> x isa Number && !isnan(x), values)
+end
+
+"""
+Get valid genre data with indices for alignment
+"""
+function get_valid_genre_data(tracks::DataFrame, genre_col::String)
+    if isnothing(genre_col) || !(genre_col in names(tracks))
+        return nothing, Int[]
+    end
+    
+    genre_data = tracks[!, genre_col]
+    valid_indices = findall(x -> !ismissing(x), genre_data)
+    valid_genres = genre_data[valid_indices]
+    
+    return valid_genres, valid_indices
+end
+
+"""
+Create standardized feature matrix for analysis
+"""
+function prepare_feature_matrix(features::DataFrame, max_samples::Int=10000)
+    # Find numeric columns
+    numeric_cols = String[]
+    for col in names(features)
+        values = extract_numeric_values(features, col)
+        if !isempty(values)
+            push!(numeric_cols, col)
+        end
+    end
+    
+    if isempty(numeric_cols)
+        return nothing, String[]
+    end
+    
+    # Sample data if too large
+    n_samples = min(max_samples, nrow(features))
+    sample_indices = sample(1:nrow(features), n_samples, replace=false)
+    
+    # Create matrix with imputation
+    feature_matrix = Matrix{Float64}(undef, n_samples, length(numeric_cols))
+    for (i, col) in enumerate(numeric_cols)
+        values = features[sample_indices, col]
+        clean_values = extract_numeric_values(features, col)
+        col_mean = isempty(clean_values) ? 0.0 : mean(clean_values)
+        feature_matrix[:, i] = [ismissing(v) || isnan(v) ? col_mean : Float64(v) for v in values]
+    end
+    
+    # Standardize
+    feature_matrix_std = (feature_matrix .- mean(feature_matrix, dims=1)) ./ (std(feature_matrix, dims=1) .+ 1e-10)
+    
+    return feature_matrix_std, numeric_cols
+end
+
+#%% ============================================================================
 # SECTION 1: DATA LOADING AND INITIAL INSPECTION
 # ==============================================================================
 
 """
 Load and prepare the tracks and features datasets
 """
-function load_datasets(tracks_path="../data/tracks.csv", 
-                       features_path="../data/features.csv")
+function load_datasets(tracks_path="data/tracks.csv", 
+                       features_path="data/features.csv")
     println("\n=== Loading Datasets ===")
     
     # Load tracks with multi-level column structure
@@ -64,7 +129,7 @@ function load_datasets(tracks_path="../data/tracks.csv",
 end
 
 """
-Basic data quality assessment
+Simple data quality assessment
 """
 function data_quality_report(df::DataFrame, name::String)
     println("\n" * "="^80)
@@ -118,18 +183,17 @@ function analyze_temporal_patterns(tracks::DataFrame)
     println("TEMPORAL ANALYSIS")
     println("="^80)
     
-    # Extract date columns
+    # Find date columns
     date_cols = find_columns(tracks, "date")
-    
     println("\nAvailable date columns:")
     for col in date_cols
         println("  - $col")
     end
     
-    # Try to find and analyze track creation date
+    # Find and analyze track creation date
     date_created_col = find_column(tracks, "track_date_created")
     
-    if ! isnothing(date_created_col)
+    if !isnothing(date_created_col)
         dates = tracks[!, date_created_col]
         valid_dates = collect(skipmissing(dates))
         
@@ -138,9 +202,70 @@ function analyze_temporal_patterns(tracks::DataFrame)
             println("  Earliest: $(minimum(valid_dates))")
             println("  Latest: $(maximum(valid_dates))")
             println("  Total tracks with dates: $(length(valid_dates))")
+            
+            # Yearly distribution analysis
+            if length(valid_dates) > 100
+                # Parse dates if they are strings
+                parsed_dates = []
+                for date_val in valid_dates
+                    try
+                        if date_val isa String
+                            # Try common date formats
+                            parsed_date = nothing
+                            for fmt in [dateformat"yyyy-mm-dd", dateformat"mm/dd/yyyy", dateformat"dd-mm-yyyy", dateformat"yyyy/mm/dd"]
+                                try
+                                    parsed_date = Date(date_val, fmt)
+                                    break
+                                catch
+                                    continue
+                                end
+                            end
+                            if !isnothing(parsed_date)
+                                push!(parsed_dates, parsed_date)
+                            end
+                        elseif date_val isa Date
+                            push!(parsed_dates, date_val)
+                        end
+                    catch e
+                        # Skip invalid dates
+                        continue
+                    end
+                end
+                
+                if !isempty(parsed_dates)
+                    years = year.(parsed_dates)
+                    year_counts = countmap(years)
+                    
+                    if length(year_counts) > 1
+                        sorted_years = sort(collect(year_counts))
+                        year_labels = [string(x[1]) for x in sorted_years]
+                        year_values = [x[2] for x in sorted_years]
+                        
+                        p_temporal = bar(year_labels, year_values,
+                                       title="Tracks Created by Year",
+                                       xlabel="Year",
+                                       ylabel="Number of Tracks",
+                                       color=:steelblue,
+                                       legend=false,
+                                       size=(1000, 600))
+                        display(p_temporal)
+                        savefig(p_temporal, "temporal_distribution.png")
+                        println("\n✓ Saved: temporal_distribution.png")
+                        
+                        # Print year range info
+                        println("\nParsed $(length(parsed_dates)) valid dates from $(length(valid_dates)) total entries")
+                        println("Year range: $(minimum(years)) to $(maximum(years))")
+                    else
+                        println("\nInsufficient year variation for temporal analysis")
+                    end
+                else
+                    println("\nCould not parse any valid dates from the data")
+                    println("Sample date values: $(valid_dates[1:min(5, length(valid_dates))])")
+                end
+            end
         end
     else
-        println("\nNote: Track creation date column not found or has different name")
+        println("\nNote: Track creation date column not found")
     end
     
     return nothing
@@ -158,7 +283,7 @@ function analyze_genres(tracks::DataFrame)
     genre_cols = find_columns(tracks, "genre")
     println("\nGenre columns found: $genre_cols")
     
-    # Try to find top-level genre column
+    # Find top-level genre column
     genre_top_col = find_column(tracks, "genre_top")
     
     if !isnothing(genre_top_col)
@@ -238,8 +363,7 @@ function analyze_duration(tracks::DataFrame)
             println("  Hours: $(round(total_hours, digits=2))")
             println("  Days: $(round(total_days, digits=2))")
             
-            # Visualization - filter for reasonable display
-            # Fixed: Use proper array indexing with broadcasting
+            # Visualization 
             display_durations = filter(x -> x < 800, durations)
             
             p2 = histogram(display_durations, 
@@ -276,117 +400,10 @@ function analyze_duration(tracks::DataFrame)
     return nothing
 end
 
-"""
-Analyze user engagement metrics (listens, favorites, comments)
-"""
-function analyze_engagement(tracks::DataFrame)
-    println("\n" * "="^80)
-    println("USER ENGAGEMENT ANALYSIS")
-    println("="^80)
-    
-    # Search for engagement columns
-    engagement_patterns = ["track_listens", "track_favorites", "track_comments", "track_interest"]
-    found_metrics = Dict{String, String}()
-    
-    for pattern in engagement_patterns
-        col = find_column(tracks, pattern)
-        if !isnothing(col)
-            found_metrics[pattern] = col
-        end
-    end
-    
-    if isempty(found_metrics)
-        println("\nNo engagement metrics found")
-        return nothing
-    end
-    
-    println("\nFound engagement metrics:")
-    for (metric, col) in found_metrics
-        println("  - $metric: $col")
-    end
-    
-    # Analyze each metric
-    plots_list = []
-    for (metric, col) in found_metrics
-        all_values = tracks[!, col]
-        values = collect(skipmissing(all_values))
-        values = filter(x -> x isa Number && !isnan(x) && x >= 0, values)
-        
-        if !isempty(values)
-            println("\n$metric Statistics:")
-            println("  Count: $(length(values))")
-            println("  Mean: $(round(mean(values), digits=2))")
-            println("  Median: $(round(median(values), digits=2))")
-            println("  Max: $(maximum(values))")
-            if length(values) > 1
-                println("  90th Percentile: $(round(quantile(values, 0.90), digits=2))")
-            end
-            
-            # Filter outliers for visualization
-            if length(values) > 1
-                threshold = quantile(values, 0.95)
-                filtered_values = filter(x -> x <= threshold, values)
-                
-                if !isempty(filtered_values)
-                    p = histogram(filtered_values,
-                                title=uppercasefirst(replace(metric, "_" => " ")),
-                                xlabel="Count",
-                                ylabel="Frequency",
-                                legend=false,
-                                color=:steelblue,
-                                alpha=0.7,
-                                bins=min(50, length(unique(filtered_values))))
-                    push!(plots_list, p)
-                end
-            end
-        end
-    end
-    
-    # Create combined plot
-    if !isempty(plots_list)
-        n_plots = length(plots_list)
-        layout_rows = Int(ceil(n_plots / 2))
-        layout_cols = min(2, n_plots)
-        
-        p_combined = plot(plots_list..., 
-                         layout=(layout_rows, layout_cols), 
-                         size=(1400, layout_rows * 500))
-        display(p_combined)
-        savefig(p_combined, "engagement_metrics.png")
-        println("\n✓ Saved: engagement_metrics. png")
-    end
-    
-    return nothing
-end
 
 #%% ============================================================================
 # SECTION 3: AUDIO FEATURES ANALYSIS
 # ==============================================================================
-
-"""
-Extract and organize feature columns by type
-"""
-function organize_features(features::DataFrame)
-    println("\n" * "="^80)
-    println("FEATURE ORGANIZATION")
-    println("="^80)
-    
-    feature_groups = Dict{String, Vector{String}}()
-    
-    # Common feature types in audio analysis
-    feature_types = ["mfcc", "chroma", "spectral", "zcr", "rmse", 
-                     "tonnetz", "contrast", "bandwidth", "centroid", "rolloff"]
-    
-    for ftype in feature_types
-        matching_cols = find_columns(features, ftype)
-        if !isempty(matching_cols)
-            feature_groups[ftype] = matching_cols
-            println("  $ftype: $(length(matching_cols)) features")
-        end
-    end
-    
-    return feature_groups
-end
 
 """
 Compute comprehensive statistics for feature groups
@@ -590,25 +607,19 @@ function analyze_feature_correlations(features::DataFrame, feature_groups::Dict)
         # Compute correlation
         cor_matrix = cor(feature_matrix)
         
-        # Visualization
-        p_cor = heatmap(cor_matrix,
-                       title="Feature Correlation Matrix (Sample)",
-                       xlabel="Feature Index",
-                       ylabel="Feature Index",
-                       color=:RdBu,
-                       clims=(-1, 1),
-                       size=(1000, 900))
-        display(p_cor)
-        savefig(p_cor, "feature_correlations.png")
-        println("✓ Saved: feature_correlations.png")
-        
+
         # Find highly correlated pairs
         println("\nHighly Correlated Feature Pairs (|r| > 0.8):")
         high_cor_pairs = []
         for i in 1:length(sampled_cols)
             for j in (i+1):length(sampled_cols)
                 if abs(cor_matrix[i, j]) > 0.8 && ! isnan(cor_matrix[i, j])
-                    push!(high_cor_pairs, (sampled_cols[i], sampled_cols[j], cor_matrix[i, j]))
+                    col1_short = split(sampled_cols[i], "_")[end]
+                    col2_short = split(sampled_cols[j], "_")[end]
+                    # Skip if the shortened names are the same (indicating same feature type)
+                    if col1_short != col2_short
+                        push!(high_cor_pairs, (sampled_cols[i], sampled_cols[j], cor_matrix[i, j]))
+                    end
                 end
             end
         end
@@ -805,19 +816,12 @@ end
 # ==============================================================================
 
 """
-Compare audio features across genres - USING DIRECT INDEXING
+Compare audio features across genres
 """
 function compare_features_by_genre(tracks::DataFrame, features::DataFrame)
     println("\n" * "="^80)
     println("GENRE-BASED FEATURE COMPARISON")
     println("="^80)
-    
-    # The track IDs are actually the row indices, not a separate column! 
-    # Both DataFrames should have the same row indices representing track_id
-    
-    println("\nNote: Using DataFrame indices as track IDs")
-    println("Tracks rows: $(nrow(tracks))")
-    println("Features rows: $(nrow(features))")
     
     # Find genre column
     genre_col = find_column(tracks, "genre_top")
@@ -826,31 +830,19 @@ function compare_features_by_genre(tracks::DataFrame, features::DataFrame)
         return nothing
     end
     
-    # Since both datasets should be aligned by row index, we can directly work with them
-    # But first let's check if they have the same number of rows
-    if nrow(tracks) != nrow(features)
-        println("Warning: Different number of rows in tracks ($(nrow(tracks))) and features ($(nrow(features)))")
-        println("Will use only matching rows")
-        
-        # Use the minimum common rows
-        n_rows = min(nrow(tracks), nrow(features))
-        tracks_subset = tracks[1:n_rows, :]
-        features_subset = features[1:n_rows, :]
-    else
-        tracks_subset = tracks
-        features_subset = features
-    end
+    # Align datasets
+    n_rows = min(nrow(tracks), nrow(features))
+    tracks_subset = tracks[1:n_rows, :]
+    features_subset = features[1:n_rows, :]
     
-    # Get genre information - filter out missing values first
-    genre_data = tracks_subset[!, genre_col]
-    valid_indices = findall(x -> !ismissing(x), genre_data)
-    
-    if isempty(valid_indices)
+    # Get valid genre data
+    valid_genres, valid_indices = get_valid_genre_data(tracks_subset, genre_col)
+    if isnothing(valid_genres) || isempty(valid_indices)
         println("No valid genre data found")
         return nothing
     end
     
-    valid_genres = genre_data[valid_indices]
+    # Get top genres
     genre_counts = countmap(valid_genres)
     top_genres = [x[1] for x in sort(collect(genre_counts), by=x->x[2], rev=true)[1:min(8, length(genre_counts))]]
     
@@ -861,80 +853,58 @@ function compare_features_by_genre(tracks::DataFrame, features::DataFrame)
     
     # Find representative features
     feature_patterns = ["mfcc_mean", "centroid_mean", "bandwidth_mean", "zcr"]
-    available_features = []
+    available_features = String[]
     
     for pattern in feature_patterns
         col = find_column(features_subset, pattern)
-        if ! isnothing(col)
+        if !isnothing(col)
             push!(available_features, col)
         end
     end
     
     if isempty(available_features)
-        println("\nNo matching features found.  Trying alternative patterns...")
-        # Try to find any mean features
+        # Fallback to any mean features
         mean_features = filter(x -> occursin("mean", lowercase(x)), names(features_subset))
-        if !isempty(mean_features)
-            available_features = mean_features[1:min(4, length(mean_features))]
-            println("Using features: $(join(available_features, ", "))")
-        else
-            println("Could not find suitable features for comparison")
-            return nothing
-        end
+        available_features = mean_features[1:min(4, length(mean_features))]
     end
     
     available_features = available_features[1:min(4, length(available_features))]
     
-    println("\nComparing $(length(available_features)) features across genres")
-    
-    # Create plots
+    # Create comparison plots
     plots_list = []
+    genre_data = tracks_subset[!, genre_col]
+    
     for feat in available_features
-        try
-            genre_values = []
-            genre_labels = []
+        genre_values = Float64[]
+        genre_labels = String[]
+        
+        for genre in top_genres
+            genre_indices = findall(i -> i <= length(genre_data) && !ismissing(genre_data[i]) && genre_data[i] == genre, 1:length(genre_data))
             
-            for genre in top_genres
-                # Find indices where genre matches (handling missing values)
-                genre_indices = findall(i -> !ismissing(genre_data[i]) && genre_data[i] == genre, 1:length(genre_data))
-                
-                if !isempty(genre_indices)
-                    values = features_subset[genre_indices, feat]
-                    values = collect(skipmissing(values))
-                    values = filter(x -> x isa Number && !isnan(x), values)
-                    
-                    if !isempty(values)
-                        append!(genre_values, values)
-                        append!(genre_labels, fill(string(genre), length(values)))
-                    end
+            if !isempty(genre_indices)
+                values = extract_numeric_values(features_subset[genre_indices, :], feat)
+                if !isempty(values)
+                    append!(genre_values, values)
+                    append!(genre_labels, fill(string(genre), length(values)))
                 end
             end
-            
-            if !isempty(genre_values) && length(unique(genre_labels)) > 1
-                feat_name = split(feat, "_")[1]
-                p = boxplot(genre_labels, genre_values,
-                           title="$feat_name by Genre",
-                           xlabel="Genre",
-                           ylabel="Value",
-                           legend=false,
-                           xrotation=45,
-                           size=(800, 600),
-                           bottom_margin=10Plots.mm)
-                push!(plots_list, p)
-                println("  ✓ Created plot for $feat")
-            else
-                println("  ⚠ Skipping $feat - insufficient data")
-            end
-        catch e
-            println("  ✗ Error plotting $feat: $e")
-            # Print more detailed error info
-            if isdefined(Main, :InteractiveUtils)
-                showerror(stdout, e, catch_backtrace())
-                println()
-            end
+        end
+        
+        if !isempty(genre_values) && length(unique(genre_labels)) > 1
+            feat_name = split(feat, "_")[1]
+            p = boxplot(genre_labels, genre_values,
+                       title="$feat_name by Genre",
+                       xlabel="Genre",
+                       ylabel="Value",
+                       legend=false,
+                       xrotation=45,
+                       size=(800, 600),
+                       bottom_margin=10Plots.mm)
+            push!(plots_list, p)
         end
     end
     
+    # Display results
     if !isempty(plots_list)
         n_plots = length(plots_list)
         layout_rows = Int(ceil(n_plots / 2))
@@ -945,93 +915,338 @@ function compare_features_by_genre(tracks::DataFrame, features::DataFrame)
                            size=(layout_cols * 800, layout_rows * 600))
         display(p_genre_comp)
         savefig(p_genre_comp, "genre_feature_comparison.png")
-        println("\n✓ Saved: genre_feature_comparison. png")
-        println("Successfully created $(n_plots) comparison plots")
-    else
-        println("\nCould not create any comparison plots")
+        println("\n✓ Saved: genre_feature_comparison.png")
     end
     
     return nothing
 end
+
 #%% ============================================================================
-# SECTION 6: SUMMARY AND CONCLUSIONS
+# SECTION 6: POPULARITY AND SUCCESS ANALYSIS
 # ==============================================================================
 
 """
-Generate comprehensive summary report
+Find and validate popularity metrics in the dataset
 """
-function generate_summary_report(tracks::DataFrame, features::DataFrame)
+function get_popularity_metrics(tracks::DataFrame)
+    metric_patterns = ["listens", "favorites", "comments", "interest"]
+    popularity_metrics = Dict{String, String}()
+    
+    for pattern in metric_patterns
+        col = find_column(tracks, pattern)
+        if !isnothing(col)
+            # Validate that column has numeric data
+            values = extract_numeric_values(tracks, col)
+            if !isempty(values)
+                popularity_metrics[pattern] = col
+            end
+        end
+    end
+    
+    return popularity_metrics
+end
+
+"""
+Analyze overall popularity patterns and distributions
+"""
+function analyze_popularity_distributions(tracks::DataFrame, popularity_metrics::Dict)
+    if isempty(popularity_metrics)
+        println("No popularity metrics found")
+        return nothing
+    end
+    
+    println("Found popularity metrics: $(keys(popularity_metrics))")
+    
+    plots_list = []
+    
+    for (metric_name, metric_col) in popularity_metrics
+        values = extract_numeric_values(tracks, metric_col)
+        
+        if length(values) > 100
+            # Log-scale distribution
+            log_values = log10.(values .+ 1)
+            
+            p = histogram(log_values,
+                         title="$metric_name Distribution (Log Scale)",
+                         xlabel="Log10($metric_name + 1)",
+                         ylabel="Frequency",
+                         bins=50,
+                         color=:coral,
+                         alpha=0.7,
+                         legend=false,
+                         size=(800, 600))
+            push!(plots_list, p)
+        end
+    end
+    
+    return plots_list
+end
+
+"""
+Analyze popularity patterns by genre
+"""
+function analyze_genre_popularity(tracks::DataFrame, popularity_metrics::Dict)
+    genre_col = find_column(tracks, "genre_top")
+    if isnothing(genre_col)
+        println("Cannot find genre column for popularity analysis")
+        return []
+    end
+    
+    plots_list = []
+    
+    for (metric_name, metric_col) in popularity_metrics
+        # Get valid data
+        valid_mask = .!ismissing.(tracks[!, genre_col]) .& .!ismissing.(tracks[!, metric_col])
+        valid_data = tracks[valid_mask, :]
+        
+        if nrow(valid_data) < 20
+            continue
+        end
+        
+        # Calculate genre averages
+        genre_stats = combine(groupby(valid_data, genre_col), 
+                            metric_col => mean => :avg_metric,
+                            metric_col => length => :count)
+        
+        # Filter genres with sufficient data
+        genre_stats = genre_stats[genre_stats.count .>= 20, :]
+        
+        if nrow(genre_stats) > 0
+            sort!(genre_stats, :avg_metric, rev=true)
+            top_genres = genre_stats[1:min(10, nrow(genre_stats)), :]
+            
+            p = bar(string.(top_genres[!, genre_col]), top_genres.avg_metric,
+                   title="Average $(uppercasefirst(metric_name)) by Genre",
+                   xlabel="Genre",
+                   ylabel="Average $(uppercasefirst(metric_name))",
+                   xrotation=45,
+                   legend=false,
+                   color=:viridis,
+                   size=(1000, 600),
+                   bottom_margin=10Plots.mm)
+            push!(plots_list, p)
+        end
+    end
+    
+    return plots_list
+end
+
+"""
+Analyze relationship between track duration and popularity
+"""
+function analyze_duration_vs_popularity(tracks::DataFrame, popularity_metrics::Dict)
+    duration_col = find_column(tracks, "duration")
+    if isnothing(duration_col) || isempty(popularity_metrics)
+        return []
+    end
+    
+    primary_metric = first(values(popularity_metrics))
+    primary_name = first(keys(popularity_metrics))
+    plots_list = []
+    
+    # Get valid data
+    valid_mask = .!ismissing.(tracks[!, primary_metric]) .& .!ismissing.(tracks[!, duration_col])
+    valid_data = tracks[valid_mask, :]
+    
+    if nrow(valid_data) < 100
+        return plots_list
+    end
+    
+    durations = extract_numeric_values(valid_data, duration_col)
+    popularity = extract_numeric_values(valid_data, primary_metric)
+    
+    # Filter reasonable ranges
+    valid_indices = findall(i -> durations[i] > 30 && durations[i] < 600 && popularity[i] > 0, 1:length(durations))
+    
+    if length(valid_indices) > 50
+        filtered_durations = durations[valid_indices]
+        filtered_popularity = popularity[valid_indices]
+        
+        # Sample for performance
+        if length(filtered_durations) > 2000
+            sample_indices = sample(1:length(filtered_durations), 2000, replace=false)
+            filtered_durations = filtered_durations[sample_indices]
+            filtered_popularity = filtered_popularity[sample_indices]
+        end
+        
+        # Scatter plot
+        p1 = scatter(filtered_durations, log10.(filtered_popularity .+ 1),
+                    title="Track Duration vs Popularity",
+                    xlabel="Duration (seconds)",
+                    ylabel="Log10($primary_name + 1)",
+                    alpha=0.5,
+                    markersize=2,
+                    color=:steelblue,
+                    legend=false,
+                    size=(800, 600))
+        push!(plots_list, p1)
+        
+        # Duration bins analysis
+        duration_bins = 60:60:360
+        bin_popularity = Float64[]
+        bin_labels = String[]
+        
+        for i in 1:(length(duration_bins)-1)
+            mask = (filtered_durations .>= duration_bins[i]) .& (filtered_durations .< duration_bins[i+1])
+            if sum(mask) > 10
+                avg_pop = mean(filtered_popularity[mask])
+                push!(bin_popularity, avg_pop)
+                push!(bin_labels, "$(Int(duration_bins[i]/60))-$(Int(duration_bins[i+1]/60))min")
+            end
+        end
+        
+        if !isempty(bin_popularity)
+            p2 = bar(bin_labels, bin_popularity,
+                    title="Average $primary_name by Duration Range",
+                    xlabel="Duration Range",
+                    ylabel="Average $primary_name",
+                    color=:orange,
+                    legend=false,
+                    size=(800, 600))
+            push!(plots_list, p2)
+        end
+    end
+    
+    return plots_list
+end
+
+"""
+Main popularity analysis function 
+"""
+function analyze_popularity_patterns(tracks::DataFrame)
     println("\n" * "="^80)
-    println("COMPREHENSIVE DATA SUMMARY")
+    println("POPULARITY & SUCCESS ANALYSIS")
     println("="^80)
     
-    # Count unique genres
-    genre_col = find_column(tracks, "genre_top")
-    n_genres = 0
-    if !isnothing(genre_col)
-        valid_genres = collect(skipmissing(tracks[!, genre_col]))
-        n_genres = length(unique(valid_genres))
+    # Get available metrics
+    popularity_metrics = get_popularity_metrics(tracks)
+    
+    if isempty(popularity_metrics)
+        println("No popularity metrics found")
+        return nothing
     end
     
-    summary = """
-    # FMA Dataset Exploratory Data Analysis Summary
+    # Collect all plots
+    all_plots = []
     
-    ## Dataset Overview
-    - **Tracks**: $(nrow(tracks)) tracks
-    - **Features**: $(ncol(features)) audio features extracted
-    - **Genres**: $n_genres unique top-level genres
+    # 1. Overall distributions
+    distribution_plots = analyze_popularity_distributions(tracks, popularity_metrics)
+    append!(all_plots, distribution_plots)
     
-    ## Key Findings
+    # 2. Genre-based analysis
+    genre_plots = analyze_genre_popularity(tracks, popularity_metrics)
+    append!(all_plots, genre_plots)
     
-    ### 1. Data Quality
-    - Comprehensive multi-level metadata structure
-    - Rich audio feature extraction (MFCC, spectral, temporal)
-    - Some missing values in metadata fields
+    # 3. Duration analysis
+    duration_plots = analyze_duration_vs_popularity(tracks, popularity_metrics)
+    append!(all_plots, duration_plots)
     
-    ### 2.  Audio Features
-    - High-dimensional feature space with $(ncol(features)) features
-    - Multiple feature types: MFCC, chroma, spectral, temporal
-    - Features show expected correlations within groups
-    
-    ### 3.  Data Characteristics
-    - Large-scale dataset suitable for machine learning
-    - Diverse genre representation
-    - Rich metadata including user engagement metrics
-    
-    ## Recommendations
-    
-    1. **For Classification Tasks**:
-       - Use dimensionality reduction (PCA) to handle high-dimensional features
-       - Consider class imbalance in genre distribution
-       - Implement cross-validation strategies
-    
-    2. **For Clustering/Recommendation**:
-       - Leverage audio features for similarity metrics
-       - Combine content-based and collaborative filtering
-       - Explore hierarchical genre structure
-    
-    3. **For Further Analysis**:
-       - Investigate artist and album effects
-       - Perform temporal trend analysis
-       - Explore feature engineering opportunities
-    
-    ## Generated Visualizations
-    - Genre distribution
-    - Duration statistics
-    - Engagement metrics
-    - Feature distributions and correlations
-    - PCA and clustering analysis
-    - Genre-based feature comparisons
-    """
-    
-    println(summary)
-    
-    # Save report
-    open("eda_summary_report.md", "w") do file
-        write(file, summary)
+    # Display results
+    if !isempty(all_plots)
+        # Split into manageable chunks
+        chunk_size = 4
+        for i in 1:chunk_size:length(all_plots)
+            end_idx = min(i + chunk_size - 1, length(all_plots))
+            chunk_plots = all_plots[i:end_idx]
+            
+            if length(chunk_plots) == 1
+                display(chunk_plots[1])
+                savefig(chunk_plots[1], "popularity_analysis_$(i).png")
+            else
+                layout_rows = Int(ceil(length(chunk_plots) / 2))
+                p_combined = plot(chunk_plots..., 
+                                layout=(layout_rows, 2), 
+                                size=(1600, layout_rows * 600))
+                display(p_combined)
+                savefig(p_combined, "popularity_analysis_$(i).png")
+            end
+        end
+        println("\n✓ Saved popularity analysis visualizations")
+    else
+        println("No visualizations could be created")
     end
     
-    println("\n✓ Summary report saved to 'eda_summary_report.md'")
+    return nothing
+end
+
+
+#%% ============================================================================
+# HELPER FUNCTIONS FOR FEATURE ORGANIZATION
+# ==============================================================================
+
+"""
+Organize features into logical groups for analysis
+"""
+function organize_features(features::DataFrame)
+    feature_groups = Dict{String, Vector{String}}()
     
-    return summary
+    # Get all column names
+    all_cols = names(features)
+    
+    # MFCC features
+    mfcc_cols = filter(x -> occursin("mfcc", lowercase(x)), all_cols)
+    if !isempty(mfcc_cols)
+        feature_groups["mfcc"] = mfcc_cols
+    end
+    
+    # Spectral features
+    spectral_patterns = ["centroid", "bandwidth", "rolloff", "contrast", "flatness"]
+    spectral_cols = String[]
+    for pattern in spectral_patterns
+        matching = filter(x -> occursin(pattern, lowercase(x)), all_cols)
+        append!(spectral_cols, matching)
+    end
+    if !isempty(spectral_cols)
+        feature_groups["spectral"] = spectral_cols
+    end
+    
+    # Rhythm features
+    rhythm_patterns = ["tempo", "beat", "rhythm"]
+    rhythm_cols = String[]
+    for pattern in rhythm_patterns
+        matching = filter(x -> occursin(pattern, lowercase(x)), all_cols)
+        append!(rhythm_cols, matching)
+    end
+    if !isempty(rhythm_cols)
+        feature_groups["rhythm"] = rhythm_cols
+    end
+    
+    # Chroma features
+    chroma_cols = filter(x -> occursin("chroma", lowercase(x)), all_cols)
+    if !isempty(chroma_cols)
+        feature_groups["chroma"] = chroma_cols
+    end
+    
+    # Zero crossing rate
+    zcr_cols = filter(x -> occursin("zcr", lowercase(x)), all_cols)
+    if !isempty(zcr_cols)
+        feature_groups["zcr"] = zcr_cols
+    end
+    
+    # Other features
+    covered_cols = Set{String}()
+    for (_, cols) in feature_groups
+        union!(covered_cols, cols)
+    end
+    
+    other_cols = filter(x -> !(x in covered_cols), all_cols)
+    # Filter for numeric columns only
+    numeric_other = String[]
+    for col in other_cols
+        values = extract_numeric_values(features, col)
+        if !isempty(values)
+            push!(numeric_other, col)
+        end
+    end
+    
+    if !isempty(numeric_other)
+        feature_groups["other"] = numeric_other
+    end
+    
+    println("\nFeature Groups Created:")
+    for (group_name, cols) in feature_groups
+        println("  $group_name: $(length(cols)) features")
+    end
+    
+    return feature_groups
 end
