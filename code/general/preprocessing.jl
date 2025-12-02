@@ -204,3 +204,28 @@ function transform_lda_mlj(lda_mach, data::AbstractArray{<:Real,2})
     return MLJ.matrix(transformed_table)
 end
 
+
+function extract_features(df)
+    # Extract feature columns (exclude track_id and listens)
+    feature_cols = [col for col in names(df) if col != "track_listens" && col != "track_id"]
+    features_df = select(df, feature_cols)
+    print(feature_cols)
+    # Check for and handle non-numeric columns
+    # Convert DataFrame to matrix, handling any string columns
+    numeric_cols = String[]
+    for col in names(features_df)
+        col_type = eltype(features_df[!, col])
+        if col_type <: Number
+            push!(numeric_cols, string(col))
+        else
+            println("Warning: Column $col has type $col_type and will be excluded")
+        end
+    end
+
+    # Select only numeric columns and convert to Float64 matrix
+    if length(numeric_cols) < ncol(features_df)
+        features_df = select(features_df, Symbol.(numeric_cols))
+    end
+    return features_df
+end
+

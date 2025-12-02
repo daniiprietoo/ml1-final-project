@@ -23,7 +23,9 @@ const TRACKS_FILE = "data/tracks.csv"
 const FEATURES_FILE = "data/features.csv"
 
 # Load and merge data
-df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens])[1:1000, :]
+df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens])[1:10000, :]
+reduced_df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens], selected_features_algorithms=[:tonnetz, :chroma_stft])[1:10000, :]
+
 println("Loaded $(nrow(df)) tracks with $(ncol(df) - 2) features")  # -2 for track_id and listens
 
 listens = df.track_listens
@@ -49,28 +51,11 @@ println("  Medium: $(sum(targets .== "Medium"))")
 println("  High: $(sum(targets .== "High"))")
 println()
 
-# Extract feature columns (exclude track_id and listens)
-feature_cols = [col for col in names(df) if col != "track_listens" && col != "track_id"]
-features_df = select(df, feature_cols)
-print(feature_cols)
-# Check for and handle non-numeric columns
-# Convert DataFrame to matrix, handling any string columns
-numeric_cols = String[]
-for col in names(features_df)
-    col_type = eltype(features_df[!, col])
-    if col_type <: Number
-        push!(numeric_cols, string(col))
-    else
-        println("Warning: Column $col has type $col_type and will be excluded")
-    end
-end
 
-# Select only numeric columns and convert to Float64 matrix
-if length(numeric_cols) < ncol(features_df)
-    features_df = select(features_df, Symbol.(numeric_cols))
-end
-
+features_df = extract_features(df)
+reduced_features_df = extract_features(reduced_df)
 inputs = Matrix{Float64}(features_df)
+reduced_inputs = Matrix{Float64}(reduced_features_df)
 
 println("Input features shape: $(size(inputs))")
 println()
@@ -87,6 +72,9 @@ train_inputs = inputs[trainIndexes, :]
 train_targets = targets[trainIndexes]
 test_inputs = inputs[testIndexes, :]
 test_targets = targets[testIndexes]
+
+reduced_train_inputs = reduced_inputs[trainIndexes, :]
+reduced_test_inputs = reduced_inputs[testIndexes, :]
 
 println("Training set: $(size(train_inputs, 1)) samples")
 println("Test set: $(size(test_inputs, 1)) samples")
@@ -217,9 +205,9 @@ println("=" ^ 80)
 println("Best Configurations - PCA")
 println(best_configs_pca)
 println("=" ^ 80)
-plot_grouped_comparison(results_df_pca; title_str="Best Model Performance (PCA): Accuracy vs F1")
-plot_tradeoff_scatter(results_df_pca; title_str="PCA Approach: Trade-off Analysis")
-save_results_to_csv(results_df_pca, "results/pca.csv")
+#plot_grouped_comparison(results_df_pca; title_str="Best Model Performance (PCA): Accuracy vs F1")
+#plot_tradeoff_scatter(results_df_pca; title_str="PCA Approach: Trade-off Analysis")
+#save_results_to_csv(results_df_pca, "results/pca.csv")
 
 results_df_lda, best_configs_lda = run_approach_experiments(
     "LDA",
@@ -241,9 +229,32 @@ println("=" ^ 80)
 println("Best Configurations - LDA")
 println(best_configs_lda)
 println("=" ^ 80)
-plot_grouped_comparison(results_df_lda; title_str="Best Model Performance (LDA): Accuracy vs F1")
-plot_tradeoff_scatter(results_df_lda; title_str="LDA Approach: Trade-off Analysis")
-save_results_to_csv(results_df_lda, "results/lda.csv")
+#plot_grouped_comparison(results_df_lda; title_str="Best Model Performance (LDA): Accuracy vs F1")
+#plot_tradeoff_scatter(results_df_lda; title_str="LDA Approach: Trade-off Analysis")
+#save_results_to_csv(results_df_lda, "results/lda.csv")
+
+results_df_reduced, best_configs_reduced = run_approach_experiments(
+    "Feature Reduction",
+    configs,
+    copy(reduced_train_inputs),
+    copy(train_targets),
+    copy(reduced_test_inputs),
+    copy(test_targets),
+    k_folds=3,
+    rng=rng,
+)
+
+println("\n" * "=" ^ 80)
+println("SUMMARY - Feature Reduction")
+println("=" ^ 80)
+println(results_df_reduced)
+println("=" ^ 80)
+println("Best Configurations - Feature Reduction")
+println(best_configs_reduced)
+println("=" ^ 80)
+#plot_grouped_comparison(results_df_lda; title_str="Best Model Performance (LDA): Accuracy vs F1")
+#plot_tradeoff_scatter(results_df_lda; title_str="LDA Approach: Trade-off Analysis")
+#save_results_to_csv(results_df_lda, "results/lda.csv")
 
 
 println("\n" * "=" ^ 80)
