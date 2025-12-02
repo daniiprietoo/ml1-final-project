@@ -23,8 +23,8 @@ const TRACKS_FILE = "data/tracks.csv"
 const FEATURES_FILE = "data/features.csv"
 
 # Load and merge data
-df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens])[1:10000, :]
-reduced_df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens], selected_features_algorithms=[:tonnetz, :chroma_stft])[1:10000, :]
+df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens])
+reduced_df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens], selected_features_algorithms=[:tonnetz, :chroma_stft])
 
 println("Loaded $(nrow(df)) tracks with $(ncol(df) - 2) features")  # -2 for track_id and listens
 
@@ -44,13 +44,24 @@ function create_popularity_class(listen_count)
     end
 end
 
+function binary_popularity_class(listen_count)
+    if listen_count <= p66
+        return "Low"
+    else return "High"
+    end
+end
+
 targets = [create_popularity_class(listen) for listen in listens]
+binary_targets = [binary_popularity_class(listen) for listen in listens]
 println("Popularity:")
 println("  Low: $(sum(targets .== "Low"))")
 println("  Medium: $(sum(targets .== "Medium"))")
 println("  High: $(sum(targets .== "High"))")
 println()
-
+println("Popularity on binary targets:")
+println("  Low: $(sum(targets .== "Low"))")
+println("  High: $(sum(targets .== "High"))")
+println()
 
 features_df = extract_features(df)
 reduced_features_df = extract_features(reduced_df)
@@ -65,13 +76,16 @@ println()
 # ============================================================================
 
 println("Step 2: Performing train/test split...")
-const TEST_RATIO = 0.2
+const TEST_RATIO = 0.35
 (trainIndexes, testIndexes) = holdOut(size(inputs, 1), TEST_RATIO, rng)
 
 train_inputs = inputs[trainIndexes, :]
 train_targets = targets[trainIndexes]
 test_inputs = inputs[testIndexes, :]
 test_targets = targets[testIndexes]
+
+train_binary_targets = binary_targets[trainIndexes]
+test_binary_targets = binary_targets[testIndexes]
 
 reduced_train_inputs = reduced_inputs[trainIndexes, :]
 reduced_test_inputs = reduced_inputs[testIndexes, :]
@@ -145,16 +159,18 @@ catboost_configs = [
     Dict(:iterations => 50, :learning_rate => 0.1, :depth => 4),
     Dict(:iterations => 100, :learning_rate => 0.1, :depth => 6),
     Dict(:iterations => 200, :learning_rate => 0.05, :depth => 8),
+    Dict(:iterations => 50, :learning_rate => 0.1, :depth => 4),
+    Dict(:iterations => 100, :learning_rate => 0.1, :depth => 6),
 ]
 
 configs = Dict(
     :ANN => ann_configs,
-    :SVM => svm_configs,
-    :DT => dt_configs,
-    :KNN => knn_configs,
-    :RF => rf_configs,
-    :AdaBoost => adaboost_configs,
-    :CatBoost => catboost_configs
+    :SVC => svm_configs,
+    :DecisionTreeClassifier => dt_configs,
+    :KNeighborsClassifier => knn_configs,
+    :RandomForestClassifier => rf_configs,
+    :AdaBoostClassifier => adaboost_configs
+    #:CatBoostClassifier => catboost_configs
 )
 
 # ============================================================================
@@ -162,30 +178,29 @@ configs = Dict(
 # ============================================================================
 
 results_df, best_configs = run_approach_experiments(
-    "Full Features Dataset",
+    "Binary with Feature Reduction",
     configs,
-    copy(train_inputs),
-    copy(train_targets),
-    copy(test_inputs),
-    copy(test_targets);
+    copy(reduced_train_inputs),
+    copy(train_binary_targets),
+    copy(reduced_test_inputs),
+    copy(test_binary_targets);
     k_folds=3,
     rng=rng,
 )
 println("\n" * "=" ^ 80)
-println("SUMMARY - All features")
+println("SUMMARY - Binary with Feature Reduction")
 println("=" ^ 80)
 println(results_df)
 println("=" ^ 80)
-println("Best Configurations - All features")
+println("Best Configurations - Binary with Feature Reduction")
 println(best_configs)
 println("=" ^ 80)
-plot_grouped_comparison(results_df; title_str="Best Model Performance (Full): Accuracy vs F1")
-plot_tradeoff_scatter(results_df; title_str="Full Features: Trade-off Analysis")
-save_results_to_csv(results_df, "results/full_dataset.csv")
-
+#plot_grouped_comparison(results_df; title_str="Best Model Performance (Full): Accuracy vs F1")
+#plot_tradeoff_scatter(results_df; title_str="Full Features: Trade-off Analysis")
+#save_results_to_csv(results_df, "results/full_dataset.csv")
 
 results_df_pca, best_configs_pca = run_approach_experiments(
-    "PCA",
+    "Binary with PCA",
     configs,
     copy(train_inputs),
     copy(train_targets),
@@ -193,9 +208,8 @@ results_df_pca, best_configs_pca = run_approach_experiments(
     copy(test_targets),
     k_folds=3,
     rng=rng,
-    preprocessing=Dict(:type => :PCA, :variance_ratio => 0.95)
+    preprocessing=Dict(:type => :PCA, :variance_ratio => 0.7)
 )
-
 
 println("\n" * "=" ^ 80)
 println("SUMMARY - PCA")
@@ -255,7 +269,6 @@ println("=" ^ 80)
 #plot_grouped_comparison(results_df_lda; title_str="Best Model Performance (LDA): Accuracy vs F1")
 #plot_tradeoff_scatter(results_df_lda; title_str="LDA Approach: Trade-off Analysis")
 #save_results_to_csv(results_df_lda, "results/lda.csv")
-
 
 println("\n" * "=" ^ 80)
 println("Pipeline completed successfully!")

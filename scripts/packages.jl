@@ -24,7 +24,9 @@ Pkg.add([
     "CatBoost",
     "Statistics",
     "LinearAlgebra",
-    "NearestNeighborModels"
+    "NearestNeighborModels",
+    "MultivariateStats",
+    "StatsPlots"
 ])
 
 Pkg.update()
