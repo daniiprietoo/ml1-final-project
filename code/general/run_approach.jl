@@ -61,6 +61,7 @@ function run_approach_experiments(
         # Normalize test data using training parameters
         test_inputs_processed = normalizeZeroMean(test_inputs_processed, norm_params)
     end
+    
     if preprocessing !== nothing
         println("\n--- Applying preprocessing: $(preprocessing[:type]) ---")
         if preprocessing[:type] == :PCA
@@ -119,7 +120,7 @@ function run_approach_experiments(
         for (i, config) in enumerate(model_configs[:ANN])
             println("  ANN Config $i/$(length(model_configs[:ANN])): topology=$(config[:topology])")
             results = modelCrossValidation(:ANN, config, dataset, cv_indices)
-            acc_mean = results[1][1]
+            acc_mean = results[7][1]
             println("    Accuracy: $(round(acc_mean, digits=4)) ± $(round(results[1][2], digits=4))")
             if acc_mean > best_accs[:ANN]
                 best_accs[:ANN] = acc_mean
@@ -147,7 +148,7 @@ function run_approach_experiments(
         for (i, config) in enumerate(model_configs[:SVM])
             println("  SVM Config $i/$(length(model_configs[:SVM])): kernel=$(config[:kernel]), cost=$(config[:cost])")
             results = modelCrossValidation(:SVC, config, dataset, cv_indices)
-            acc_mean = results[1][1]
+            acc_mean = results[7][1]
             println("    Accuracy: $(round(acc_mean, digits=4)) ± $(round(results[1][2], digits=4))")
             if acc_mean > best_accs[:SVM]
                 best_accs[:SVM] = acc_mean
@@ -175,7 +176,7 @@ function run_approach_experiments(
         for (i, config) in enumerate(model_configs[:DT])
             println("  DT Config $i/$(length(model_configs[:DT])): max_depth=$(config[:max_depth])")
             results = modelCrossValidation(:DecisionTreeClassifier, config, dataset, cv_indices)
-            acc_mean = results[1][1]
+            acc_mean = results[7][1]
             println("    Accuracy: $(round(acc_mean, digits=4)) ± $(round(results[1][2], digits=4))")
             if acc_mean > best_accs[:DT]
                 best_accs[:DT] = acc_mean
@@ -203,7 +204,7 @@ function run_approach_experiments(
         for (i, config) in enumerate(model_configs[:KNN])
             println("  kNN Config $i/$(length(model_configs[:KNN])): k=$(config[:n_neighbors])")
             results = modelCrossValidation(:KNeighborsClassifier, config, dataset, cv_indices)
-            acc_mean = results[1][1]
+            acc_mean = results[7][1]
             println("    Accuracy: $(round(acc_mean, digits=4)) ± $(round(results[1][2], digits=4))")
             if acc_mean > best_accs[:KNN]
                 best_accs[:KNN] = acc_mean
@@ -231,7 +232,7 @@ function run_approach_experiments(
         for (i, config) in enumerate(model_configs[:RF])
             println("  RF Config $i/$(length(model_configs[:RF])): n_trees=$(get(config, :n_trees, 100))")
             results = modelCrossValidation(:RandomForestClassifier, config, dataset, cv_indices)
-            acc_mean = results[1][1]
+            acc_mean = results[7][1]
             println("    Accuracy: $(round(acc_mean, digits=4)) ± $(round(results[1][2], digits=4))")
             if acc_mean > best_accs[:RF]
                 best_accs[:RF] = acc_mean
@@ -259,7 +260,7 @@ function run_approach_experiments(
         for (i, config) in enumerate(model_configs[:AdaBoost])
             println("  AdaBoost Config $i/$(length(model_configs[:AdaBoost])): n_estimators=$(get(config, :n_estimators, 50))")
             results = modelCrossValidation(:AdaBoostClassifier, config, dataset, cv_indices)
-            acc_mean = results[1][1]
+            acc_mean = results[7][1]
             println("    Accuracy: $(round(acc_mean, digits=4)) ± $(round(results[1][2], digits=4))")
             if acc_mean > best_accs[:AdaBoost]
                 best_accs[:AdaBoost] = acc_mean
@@ -287,7 +288,7 @@ function run_approach_experiments(
         for (i, config) in enumerate(model_configs[:CatBoost])
             println("  CatBoost Config $i/$(length(model_configs[:CatBoost])): iterations=$(get(config, :iterations, 100))")
             results = modelCrossValidation(:CatBoostClassifier, config, dataset, cv_indices)
-            acc_mean = results[1][1]
+            acc_mean = results[7][1]
             println("    Accuracy: $(round(acc_mean, digits=4)) ± $(round(results[1][2], digits=4))")
             if acc_mean > best_accs[:CatBoost]
                 best_accs[:CatBoost] = acc_mean
