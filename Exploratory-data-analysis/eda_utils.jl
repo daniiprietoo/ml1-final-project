@@ -109,8 +109,8 @@ end
 """
 Load and prepare the tracks and features datasets
 """
-function load_datasets(tracks_path="data/tracks.csv", 
-                       features_path="data/features.csv")
+function load_datasets(tracks_path="../data/tracks.csv", 
+                       features_path="../data/features.csv")
     println("\n=== Loading Datasets ===")
     
     # Load tracks with multi-level column structure
