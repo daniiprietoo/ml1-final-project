@@ -241,12 +241,11 @@ function trainClassEnsemble(estimators::AbstractArray{Symbol, 1},
             )
             for n in 1:length(estimators)
         )...)
-        dt = getModel(:KNeighborsClassifier, Dict(:n_neighbors => 5))
+        lr = getModel(:LinearRegressor, Dict())
         model_bagging = Stack(; 
-            metalearner = dt,
+            metalearner = lr,
             resampling = Holdout(fraction_train=0.8, shuffle=true, rng=rng),
             measures = log_loss,
-            acceleration=CPUThreads(),
             base_models_NamedTuple... 
         )
 

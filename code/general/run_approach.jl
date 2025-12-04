@@ -22,7 +22,8 @@ function run_approach_experiments(
     k_folds::Int=5,
     rng::AbstractRNG=MersenneTwister(1234),
     normalize::Union{Symbol, Nothing}=:zero,
-    preprocessing::Union{Nothing, Dict}=nothing
+    preprocessing::Union{Nothing, Dict}=nothing,
+    test_n::Int=0
 )
     results_df = DataFrame(
         Approach = String[],
@@ -393,7 +394,19 @@ function run_approach_experiments(
     println("="^80)
 
     # DataFrame to store Test results
-    test_results_df = DataFrame(Model=Symbol[], Test_Accuracy=Float32[], F1=Float32[])
+    test_results_df = DataFrame(        
+        Approach = String[],
+        Model = Symbol[],
+        Config = String[],
+        Accuracy = Float32[],
+        ErrorRate = Float32[],
+        Sensitivity = Float32[],
+        Specificity = Float32[],
+        PPV = Float32[],
+        NPV = Float32[],
+        F1 = Float32[],
+        CM = Matrix{Float32}[]
+    )
 
     # Map high-level model_type (keys in model_configs/best_configs) to MLJ model symbols
     model_type_to_mlj_symbol = Dict(
@@ -402,7 +415,7 @@ function run_approach_experiments(
         :KNN      => :KNeighborsClassifier,
         :RF       => :RandomForestClassifier,
         :AdaBoost => :AdaBoostClassifier,
-        :CatBoost => :CatBoostClassifier
+        :CatBoost => :CatBoostClassifier,
     )
 
     for (model_type, config) in best_configs
@@ -416,14 +429,12 @@ function run_approach_experiments(
             # ---------- ANN TESTING ----------
             # Re-train ANN on (normalized/preprocessed) full training data
             # Note: train_inputs_f32 already contains normalization + preprocessing
+            targetsANN = oneHotEncoding(train_targets)
             ann, _ = trainClassANN(
                 config[:topology],
-                (train_inputs_f32, train_targets);
+                (train_inputs_f32, targetsANN);
                 maxEpochs      = get(config, :maxEpochs, config[:maxEpochs]),
                 learningRate   = get(config, :learningRate, config[:learningRate]),
-                validationRatio = get(config, :validationRatio, 0.0),
-                maxEpochsVal    = get(config, :maxEpochsVal, 20),
-                numExecutions   = get(config, :numExecutions, 1)
             )
 
             # Predict on processed test data
@@ -446,7 +457,19 @@ function run_approach_experiments(
             println("  -> Accuracy: $(metrics.accuracy)")
             println("  -> F1:       $(metrics.f_score)")
 
-            push!(test_results_df, (:ANN, Float32(metrics.accuracy), Float32(metrics.f_score)))
+            push!(test_results_df, (
+                approach_name,
+                :ANN,
+                string(config),
+                metrics[1][1],
+                metrics[2][1],
+                metrics[3][1],
+                metrics[4][1],
+                metrics[5][1],
+                metrics[6][1],
+                metrics[7][1],
+                metrics[8]
+            ))
 
         else
             # ---------- MLJ MODELS TESTING ----------
@@ -472,12 +495,24 @@ function run_approach_experiments(
             println("  -> Accuracy: $(metrics.accuracy)")
             println("  -> F1:       $(metrics.f_score)")
 
-            push!(test_results_df, (model_type, Float32(metrics.accuracy), Float32(metrics.f_score)))
+            push!(test_results_df, (
+                approach_name,
+                mlj_symbol,
+                string(config),
+                metrics[1][1],
+                metrics[2][1],
+                metrics[3][1],
+                metrics[4][1],
+                metrics[5][1],
+                metrics[6][1],
+                metrics[7][1],
+                metrics[8]
+            ))
         end
     end
     
     println(test_results_df)
-    save_results_to_csv(test_results_df, "results/$approach_name.csv")
+    save_results_to_csv(test_results_df, "results/test$test_n.csv")
     
     return (results_df, best_configs, preprocessing_model)
 end

@@ -25,8 +25,8 @@ const TRACKS_FILE = "data/tracks.csv"
 const FEATURES_FILE = "data/features.csv"
 
 # Load data
-df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens])
-reduced_df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens], selected_features_algorithms=[:tonnetz, :mfcc, :spectral_centroid, :spectral_bandwith])
+df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens])[1:30000, :]
+reduced_df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens], selected_features_algorithms=[:tonnetz, :mfcc, :spectral_centroid, :spectral_bandwith])[1:30000, :]
 
 # Extract Raw Inputs (Features) and Raw Targets (Listens)
 features_df = extract_features(df)
@@ -44,7 +44,7 @@ println("REDUCE Input features shape: $(size(reduced_inputs))")
 # ============================================================================
 
 println("Step 2: Performing train/test split...")
-const TEST_RATIO = 0.35
+const TEST_RATIO = 0.2
 (trainIndexes, testIndexes) = holdOut(size(inputs, 1), TEST_RATIO, rng)
 
 # 1. Split the raw listen counts
@@ -173,9 +173,9 @@ adaboost_configs = [
 ]
 
 catboost_configs = [
-    Dict(:iterations => 50, :learning_rate => 0.1, :depth => 4),
-    Dict(:iterations => 100, :learning_rate => 0.1, :depth => 6),
-    Dict(:iterations => 200, :learning_rate => 0.05, :depth => 8),
+    Dict(:iterations => 20, :learning_rate => 0.1, :depth => 4),
+    Dict(:iterations => 40, :learning_rate => 0.1, :depth => 6),
+    Dict(:iterations => 60, :learning_rate => 0.05, :depth => 8),
 ]
 
 configs = Dict(
@@ -201,7 +201,8 @@ configs = Dict(
 #     test_binary_targets;
 #     k_folds=3,
 #     rng=rng,
-#     normalize=:zero
+#     normalize=:zero,
+#     test_n=1
 # )
 # println("\n" * "=" ^ 80)
 # println("SUMMARY - Binary with Feature Reduction")
@@ -226,7 +227,8 @@ results_df_pca, best_configs_pca = run_approach_experiments(
     k_folds=3,
     rng=rng,
     preprocessing=Dict(:type => :PCA, :variance_ratio => 0.7),
-    normalize=:zero
+    normalize=:zero,
+    test_n=2
 )
 
 
@@ -253,7 +255,8 @@ results_df_lda, best_configs_lda = run_approach_experiments(
     k_folds=3,
     rng=rng,
     preprocessing=Dict(:type => :LDA, :outdim => 2),
-    normalize=:zero
+    normalize=:zero,
+    test_n=3
 )
 
 println("\n" * "=" ^ 80)
@@ -277,7 +280,8 @@ results_df_reduced, best_configs_reduced = run_approach_experiments(
     test_targets,
     k_folds=3,
     rng=rng,
-    normalize=:zero
+    normalize=:zero,
+    test_n=4
 )
 
 println("\n" * "=" ^ 80)
