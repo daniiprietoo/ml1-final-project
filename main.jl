@@ -26,7 +26,7 @@ const FEATURES_FILE = "data/features.csv"
 
 # Load data
 df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens])
-reduced_df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens], selected_features_algorithms=[:tonnetz, :mfcc, :spectral, :chroma_cqt, :spectral_bandwith, :zcr])
+reduced_df = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens], selected_features_algorithms=[:tonnetz, :mfcc, :spectral_centroid, :spectral_bandwith])
 
 # Extract Raw Inputs (Features) and Raw Targets (Listens)
 features_df = extract_features(df)
@@ -105,6 +105,11 @@ println("  Medium: $(sum(train_targets .== "Medium"))")
 println("  High: $(sum(train_targets .== "High"))")
 println()
 
+println("Training Popularity Distribution (Binary):")
+println("  Low: $(sum(train_binary_targets .== "Low"))")
+println("  High: $(sum(train_binary_targets .== "High"))")
+println()
+
 
 # ============================================================================
 # HELPER FUNCTION: Run experiments for an approach
@@ -112,14 +117,14 @@ println()
 
 # ANN Configurations (at least 8 different architectures, 1-2 hidden layers)
 ann_configs = [
-    Dict(:topology => [128], :learningRate => 0.005, :maxEpochs => 200, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
-    Dict(:topology => [64],  :learningRate => 0.005, :maxEpochs => 200, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
+    Dict(:topology => [128], :learningRate => 0.001, :maxEpochs => 300, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
+    Dict(:topology => [64],  :learningRate => 0.001, :maxEpochs => 300, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
     Dict(:topology => [128, 64], :learningRate => 0.001, :maxEpochs => 200, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
     Dict(:topology => [64, 32],  :learningRate => 0.001, :maxEpochs => 200, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
-    Dict(:topology => [100, 50], :learningRate => 0.001, :maxEpochs => 300, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
+    Dict(:topology => [10, 5], :learningRate => 0.001, :maxEpochs => 300, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
     Dict(:topology => [32, 16],  :learningRate => 0.001, :maxEpochs => 300, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
-    Dict(:topology => [30, 15], :learningRate => 0.001, :maxEpochs => 300, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
-    Dict(:topology => [64, 16], :learningRate => 0.001, :maxEpochs => 300, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
+    Dict(:topology => [32], :learningRate => 0.001, :maxEpochs => 300, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
+    Dict(:topology => [16], :learningRate => 0.001, :maxEpochs => 300, :validationRatio => 0.2, :maxEpochsVal => 20, :numExecutions => 1),
 ]
 
 # SVM Configurations (at least 8 different configurations: kernels + C values)
@@ -127,7 +132,7 @@ svm_configs = [
     Dict(:kernel => "linear", :cost => 0.1),
     Dict(:kernel => "linear", :cost => 1.0),
     Dict(:kernel => "linear", :cost => 10.0),
-    Dict(:kernel => "linear", :cost => 10.0),
+    Dict(:kernel => "linear", :cost => 20.0),
     Dict(:kernel => "linear", :cost => 50.0),
     Dict(:kernel => "linear", :cost => 100.0),
     Dict(:kernel => "sigmoid", :cost => 1.0, :gamma => 0.01, :coef0 => 0.0),
@@ -139,9 +144,9 @@ dt_configs = [
     Dict(:max_depth => 25, :min_samples_leaf => 20, :rng => rng),
     Dict(:max_depth => 30, :min_samples_leaf => 20, :rng => rng),
     Dict(:max_depth => 7, :min_samples_leaf => 20, :rng => rng),
-    Dict(:max_depth => 10, :min_samples_leaf => 50, :rng => rng),
-    Dict(:max_depth => 15, :min_samples_leaf => 50, :rng => rng),
-    Dict(:max_depth => 20, :min_samples_leaf => 50, :rng => rng),
+    Dict(:max_depth => 10, :min_samples_leaf => 20, :rng => rng),
+    Dict(:max_depth => 15, :min_samples_leaf => 20, :rng => rng),
+    Dict(:max_depth => 20, :min_samples_leaf => 20, :rng => rng),
 ]
 
 # kNN Configurations (at least 6 different k values)
@@ -187,28 +192,28 @@ configs = Dict(
 # APPROACH 1: Full Features Dataset
 # ============================================================================
 
-results_df, best_configs = run_approach_experiments(
-    "Binary with Feature Reduction",
-    configs,
-    reduced_train_inputs,
-    train_binary_targets,
-    reduced_test_inputs,
-    test_binary_targets;
-    k_folds=3,
-    rng=rng,
-    normalize=:zero
-)
-println("\n" * "=" ^ 80)
-println("SUMMARY - Binary with Feature Reduction")
-println("=" ^ 80)
-println(results_df)
-println("=" ^ 80)
-println("Best Configurations - Binary with Feature Reduction")
-println(best_configs)
-println("=" ^ 80)
-plot_grouped_comparison(results_df; title_str="Best Model Performance (Full): Accuracy vs F1")
-plot_tradeoff_scatter(results_df; title_str="Full Features: Trade-off Analysis")
-save_results_to_csv(results_df, "results/full_dataset.csv")
+# results_df, best_configs = run_approach_experiments(
+#     "Binary with Feature Reduction",
+#     configs,
+#     reduced_train_inputs,
+#     train_binary_targets,
+#     reduced_test_inputs,
+#     test_binary_targets;
+#     k_folds=3,
+#     rng=rng,
+#     normalize=:zero
+# )
+# println("\n" * "=" ^ 80)
+# println("SUMMARY - Binary with Feature Reduction")
+# println("=" ^ 80)
+# println(results_df)
+# println("=" ^ 80)
+# println("Best Configurations - Binary with Feature Reduction")
+# println(best_configs)
+# println("=" ^ 80)
+# plot_grouped_comparison(results_df; title_str="Best Model Performance (Full): Accuracy vs F1")
+# plot_tradeoff_scatter(results_df; title_str="Full Features: Trade-off Analysis")
+# save_results_to_csv(results_df, "results/full_dataset.csv")
 
 
 results_df_pca, best_configs_pca = run_approach_experiments(
