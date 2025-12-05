@@ -17,10 +17,9 @@ RFClassifier = @load RandomForestClassifier pkg=DecisionTree verbosity=0
 AdaBoostClassifier = @load AdaBoostStumpClassifier pkg=DecisionTree verbosity=0
 CatBoostClassifier = @load CatBoostClassifier pkg=CatBoost verbosity=0
 DTRegressor = MLJ.@load DecisionTreeRegressor pkg=DecisionTree verbosity=0
-
-#PCA = MLJ.@load PCA pkg=MultivariateStats verbosity=0
-
-
+LinearSVC = @load LinearSVC pkg=LIBSVM
+PCA = MLJ.@load PCA pkg=MultivariateStats verbosity=0
+LogisticClassifier = @load LogisticClassifier pkg=MLJLinearModels
 # modelSVMClassifier = SVMClassifier(kernel=LIBSVM.Kernel.RadialBasis, cost=1.0, gamma=2.0, degree=Int32(3))
 
 # modelDTClassifier = DTClassifier(max_depth=4, rng=Random.MersenneTwister(1))
@@ -41,8 +40,7 @@ function getSVCModel(modelHyperparameters::Dict)
     cost=get(modelHyperparameters, :cost, 1.0)
 
     if kernelSelected == "linear"
-        kernel= LIBSVM.Kernel.Linear
-        return SVMClassifier(kernel=kernel, cost=Float64(cost))
+        return LinearSVC(cost = Float64(cost))
     elseif kernelSelected == "rbf"
         kernel= LIBSVM.Kernel.RadialBasis
         return SVMClassifier(kernel=kernel, cost=Float64(cost), gamma=Float64(gamma), degree=Int32(degree), coef0=Float64(coef0))
@@ -60,6 +58,10 @@ end
 #     rng=get(modelHyperparameters, :rng, Random.MersenneTwister(1))
 #     return modelDTClassifier = DTClassifier(max_depth=max_depth, rng=rng)
 # end
+
+function getLR()
+    return LogisticClassifier()
+end
 
 function getkNNModel(modelHyperparameters::Dict)
     n_neighbors=get(modelHyperparameters, :n_neighbors, 3)
@@ -135,7 +137,7 @@ end
 
 function getModel(modelType::Symbol, modelHyperparameters::Dict)
 
-    @assert modelType in (:SVC, :DecisionTreeClassifier, :KNeighborsClassifier, :SVCProbabilistic) "Only SVC, DecisionTreeClassifier and KNN are supported"
+    # @assert modelType in (:SVC, :DecisionTreeClassifier, :KNeighborsClassifier, :SVCProbabilistic) "Only SVC, DecisionTreeClassifier and KNN are supported"
 
     model = nothing
     if modelType == :SVC
@@ -152,6 +154,8 @@ function getModel(modelType::Symbol, modelHyperparameters::Dict)
         model = getAdaBoostModel(modelHyperparameters)
     elseif modelType == :CatBoostClassifier
         model = getCatBoostModel(modelHyperparameters)
+    elseif modelType == :LinearRegressor
+        model = getLR()
     else
         error("Tipo de modelo no soportado: ", modelType)
     end
