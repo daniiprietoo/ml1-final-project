@@ -5,6 +5,15 @@ include("../general/utils_general.jl")
 include("../general/train_metrics.jl")
 
 
+"""
+    buildClassANN(numInputs, topology, numOutputs; transferFunctions)
+
+Construct a feed-forward neural network for classification using Flux.
+
+The network consists of a sequence of dense hidden layers defined by
+`topology` and a final output layer adapted to binary or multiclass
+classification.
+"""
 function buildClassANN(numInputs::Int, topology::AbstractArray{<:Int,1}, numOutputs::Int;
     transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology))) 
     
@@ -29,6 +38,14 @@ end;
 
 
 #Original train function
+"""
+    trainClassANNOriginal(topology, dataset; transferFunctions, maxEpochs, minLoss, learningRate)
+
+Train a classification ANN on the full dataset without early stopping or
+validation splitting.
+
+Returns the trained network and the history of training losses.
+"""
 function trainClassANNOriginal(topology::AbstractArray{<:Int,1},      
                     dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}};
                     transferFunctions::AbstractArray{<:Function,1}=fill(σ, length(topology)),
@@ -81,6 +98,15 @@ function trainClassANNOriginal(topology::AbstractArray{<:Int,1},
     return (ann, trainingLosses);      
 end
 
+"""
+    trainClassANN(topology, trainingDataset; validationDataset, testDataset, ...)
+
+Train a classification ANN with optional validation and test sets and early
+stopping based on validation loss.
+
+Returns the best-performing network (according to validation loss) and the
+history of training/validation/test losses.
+"""
 function trainClassANN(topology::AbstractArray{<:Int,1},  
     trainingDataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}; 
     validationDataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{Bool,2}}= 
@@ -204,6 +230,15 @@ end;
 
 
 
+"""
+    ANNCrossValidation(topology, dataset, crossValidationIndices; ...)
+
+Perform repeated k-fold cross-validation for a classification ANN.
+
+For each fold and for each execution, the network is trained (optionally with a
+validation split) and evaluated on the test fold. Metrics and confusion
+matrices are averaged across executions and folds.
+"""
 function ANNCrossValidation(topology::AbstractArray{<:Int,1},
     dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{<:Any,1}},
     crossValidationIndices::Array{Int64,1};

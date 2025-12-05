@@ -12,6 +12,53 @@ include("../../code/mlj_models/train_mlj.jl")
 include("../../code/mlj_models/models.jl")
 include("../../code/general/utils_plot.jl")
 
+"""
+    run_approach_experiments(
+        approach_name,
+        model_configs,
+        train_inputs,
+        train_targets,
+        test_inputs,
+        test_targets;
+        k_folds=5,
+        rng=MersenneTwister(1234),
+        normalize=:zero,
+        preprocessing=nothing,
+        test_n=0,
+    )
+
+Run a full pipeline for a given approach: normalization,
+optional dimensionality reduction (PCA/LDA), k-fold cross-validation over
+multiple model types and hyperparameter configurations, optional stacking
+ensemble, and final evaluation on a held-out test set.
+
+# Arguments
+- `approach_name`: Label used to tag all results (e.g. "Binary with PCA").
+- `model_configs`: Dict mapping high-level model symbols (e.g. `:ANN`, `:SVM`,
+  `:DT`, `:KNN`, `:RF`, `:AdaBoost`, `:CatBoost`) to vectors of hyperparameter
+  dictionaries.
+- `train_inputs`: Training feature matrix (observations in rows, features in columns).
+- `train_targets`: Vector of string labels for the training set.
+- `test_inputs`: Test feature matrix.
+- `test_targets`: Vector of string labels for the test set.
+- `k_folds`: Number of folds for cross-validation.
+- `rng`: Random number generator used for splits and models.
+- `normalize`: Normalization strategy (`:zero` for z-score, `:minmax`, or `nothing`).
+- `preprocessing`: Optional Dict describing a preprocessing step (e.g.
+  `Dict(:type => :PCA, :variance_ratio => 0.7)` or
+  `Dict(:type => :LDA, :outdim => 2)`).
+- `test_n`: Small integer used to choose the filename for saving test results.
+
+# Returns
+A tuple `(results_df, best_configs, preprocessing_model)` where:
+- `results_df`: DataFrame with cross-validation and ensemble results for all
+  tested configurations.
+- `best_configs`: Dict from model type symbol to the best hyperparameter
+  dictionary found in cross-validation.
+- `preprocessing_model`: Fitted PCA/LDA machine if preprocessing was applied,
+  otherwise `nothing`. 
+"""
+
 function run_approach_experiments(
     approach_name::String,
     model_configs::Dict,
