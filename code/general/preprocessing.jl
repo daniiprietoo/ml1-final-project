@@ -9,6 +9,12 @@ using MLJ
 PCA = @load PCA pkg=MultivariateStats
 LDA = @load LDA pkg=MultivariateStats
 
+"""
+    load_and_merge_data(tracks_file, features_file; selected_tracks_columns, selected_features_algorithms)
+
+Load track metadata and feature files, optionally selecting subsets of
+columns/algorithms, and merge them on `track_id`.
+"""
 function load_and_merge_data(tracks_file::String, features_file::String; 
                              selected_tracks_columns::Union{Nothing, Vector{Symbol}} = nothing,
                              selected_features_algorithms::Union{Nothing, Vector{Symbol}} = nothing) ::DataFrame
@@ -22,6 +28,15 @@ function load_and_merge_data(tracks_file::String, features_file::String;
     return df_final
 end
 
+"""
+    load_tracks(tracks_file; selected_columns=nothing)
+
+Load the tracks file, optionally keeping only a subset of track-level
+attributes.
+
+When `selected_columns` is `nothing`, all available track attributes are
+included.
+"""
 function load_tracks(tracks_file::String; selected_columns::Union{Nothing, Vector{Symbol}} = nothing) ::DataFrame
     @assert isfile(tracks_file) "$tracks_file not found, please specify the relative directory to this file"
     # Read headers
@@ -71,6 +86,14 @@ function load_tracks(tracks_file::String; selected_columns::Union{Nothing, Vecto
     return tracks_df
 end
 
+"""
+    load_features(features_file; selected_algorithms=nothing)
+
+Load the audio feature file, optionally keeping only a subset of feature
+algorithms.
+
+Feature columns are renamed using the pattern `algorithm_name_feature_name`.
+"""
 function load_features(features_file::String; selected_algorithms::Union{Nothing, Vector{Symbol}} = nothing) ::DataFrame
     @assert isfile(features_file) "$features_file not found, please specify the relative directory to this file"
     # Read headers
@@ -126,6 +149,13 @@ end
 # To load specific tracks columns and features algorithms:
 # df_final = load_and_merge_data(TRACKS_FILE, FEATURES_FILE; selected_tracks_columns=[:listens, :duration], selected_features_algorithms=[:mfcc, :chroma])
 
+"""
+    getPCAModel(modelHyperparameters)
+
+Build a `MultivariateStats.PCA` model from a dictionary of hyperparameters.
+
+Accepts either `:variance_ratio` or `:maxoutdim`.
+"""
 function getPCAModel(modelHyperparameters::Dict) 
     if haskey(modelHyperparameters, :variance_ratio) && !isempty(modelHyperparameters[:variance_ratio])
         variance_ratio = get(modelHyperparameters, :variance_ratio, 0.95)
@@ -139,6 +169,11 @@ function getPCAModel(modelHyperparameters::Dict)
         
 end
 
+"""
+    getLDAModel(modelHyperparameters)
+
+Build an `LDA` model from a dictionary of hyperparameters.
+"""
 function getLDAModel(modelHyperparameters::Dict) 
     if haskey(modelHyperparameters, :outdim) && !isempty(modelHyperparameters[:outdim])
         outdim = get(modelHyperparameters, :outdim, 2)
@@ -148,6 +183,13 @@ function getLDAModel(modelHyperparameters::Dict)
     return LDA()  
 end
 
+"""
+    apply_pca_mlj(data; maxoutdim=nothing, variance_ratio=nothing)
+
+Fit a PCA model using MLJ and transform the given data.
+
+Returns the transformed matrix and the fitted machine.
+"""
 function apply_pca_mlj(data::AbstractArray{<:Real,2}; maxoutdim::Union{Int, Nothing}=nothing, variance_ratio::Union{Float64, Nothing}=nothing)
     
     # Create PCA model
@@ -166,11 +208,24 @@ function apply_pca_mlj(data::AbstractArray{<:Real,2}; maxoutdim::Union{Int, Noth
     return MLJ.matrix(transformed_table), pca_mach
 end
 
+"""
+    transform_pca_mlj(pca_mach, data)
+
+Apply a previously fitted PCA machine to new data and return the transformed
+matrix.
+"""
 function transform_pca_mlj(pca_mach, data::AbstractArray{<:Real,2})
     transformed_table = MLJ.transform(pca_mach, MLJ.table(data))
     return MLJ.matrix(transformed_table)
 end
 
+"""
+    apply_lda_mlj(data, labels; outdim=nothing)
+
+Fit an LDA model using MLJ and transform the given data.
+
+Returns the transformed matrix and the fitted machine.
+"""
 function apply_lda_mlj(data::AbstractArray{<:Real,2}, labels::Vector{String}; outdim::Union{Int, Nothing}=nothing)    
     # Create LDA model
     if outdim !== nothing
@@ -186,12 +241,24 @@ function apply_lda_mlj(data::AbstractArray{<:Real,2}, labels::Vector{String}; ou
     return MLJ.matrix(transformed_table), lda_mach
 end
 
+"""
+    transform_lda_mlj(lda_mach, data)
+
+Apply a previously fitted LDA machine to new data and return the transformed
+matrix.
+"""
 function transform_lda_mlj(lda_mach, data::AbstractArray{<:Real,2})
     transformed_table = MLJ.transform(lda_mach, MLJ.table(data))
     return MLJ.matrix(transformed_table)
 end
 
 
+"""
+    extract_features(df)
+
+Extract numeric feature columns from a merged tracks–features DataFrame,
+excluding identifiers such as `track_id` and `track_listens`.
+"""
 function extract_features(df)
     # Extract feature columns (exclude track_id and listens)
     feature_cols = [col for col in names(df) if string(col) != "track_listens" && string(col) != "track_id"]

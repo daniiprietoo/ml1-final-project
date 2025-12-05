@@ -5,10 +5,16 @@ include("../mlj_models/models.jl")
 using MLJEnsembles: EnsembleModel, CPUThreads
 
 
-  function modelCrossValidation(
-    modelType::Symbol, modelHyperparameters::Dict,
-    dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{<:Any,1}},
-    crossValidationIndices::Array{Int64,1})
+"""
+        modelCrossValidation(modelType, modelHyperparameters, dataset, crossValidationIndices)
+
+High-level entry point to perform cross-validation for either MLJ models or a
+Flux ANN, depending on `modelType`.
+"""
+    function modelCrossValidation(
+        modelType::Symbol, modelHyperparameters::Dict,
+        dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{<:Any,1}},
+        crossValidationIndices::Array{Int64,1})
 
 
     if(modelType == :ANN)
@@ -42,6 +48,14 @@ using MLJEnsembles: EnsembleModel, CPUThreads
 end
 
 ##TRAIN ENSEMBLE MODELS
+"""
+    trainClassEnsemble(estimator, modelsHyperParameters, ensembleHyperParameters, trainingDataset, kFoldIndices)
+
+Train and evaluate a bagging ensemble of a single base estimator using MLJ's
+`EnsembleModel`.
+
+Per-fold metrics are aggregated into mean and standard deviation.
+"""
 function trainClassEnsemble(estimator::Symbol, 
     modelsHyperParameters::Dict,
     ensembleHyperParameters::Dict,     
@@ -152,6 +166,12 @@ end
 #Function to create tunned model, to optimize cost and max_depth in SVC and TreeClassifier
 #Receive the model symbol, and if it is a tuned params defined for this model, returns a tuned mode.
 #Otherwise, returns the base model
+"""
+    create_tuned_model(estimator_symbol, modelsHyperParameters)
+
+Create an MLJ `TunedModel` for a subset of supported estimators, or return the
+base model if no tuning configuration is defined.
+"""
 function create_tuned_model(estimator_symbol::Symbol, modelsHyperParameters::Dict)
 
     tuning_params_dict = Dict(
@@ -197,6 +217,14 @@ function create_tuned_model(estimator_symbol::Symbol, modelsHyperParameters::Dic
 end
 
 
+"""
+    trainClassEnsemble(estimators, modelsHyperParameters, ensembleHyperParameters, trainingDataset, kFoldIndices; rng)
+
+Train a stacking ensemble combining multiple base estimators and a linear
+metalearner.
+
+Returns aggregated metrics (mean±std) and the accumulated confusion matrix.
+"""
 function trainClassEnsemble(estimators::AbstractArray{Symbol, 1}, 
     modelsHyperParameters::Dict,
     ensembleHyperParameters::Dict,     

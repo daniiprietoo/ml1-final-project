@@ -2,6 +2,14 @@ using Plots
 using DataFrames
 using StatsPlots
 
+"""
+    draw_results(x, y; colors, target_names=nothing)
+
+Scatter-plot 2D features `x` coloured by class labels encoded in one-hot
+matrix `y`.
+
+Optionally provide `target_names` for legend labels.
+"""
 function draw_results(x, y; colors, target_names=nothing)
     num_classes = length(unique(colors))
 
@@ -27,6 +35,12 @@ function draw_results(x, y; colors, target_names=nothing)
     return fig;
 end
 
+"""
+    plot_model_comparison(results_df; title_str="Best Model Performance: Accuracy")
+
+Create and save a bar plot comparing the best accuracy achieved by each model
+type in `results_df`.
+"""
 function plot_model_comparison(results_df::DataFrame; title_str::String="Best Model Performance: Accuracy")
     best_results = combine(groupby(results_df, :Model), :Accuracy => maximum => :Accuracy)
     
@@ -52,6 +66,12 @@ function plot_model_comparison(results_df::DataFrame; title_str::String="Best Mo
     display(p)
 end
 
+"""
+    plot_grouped_comparison(results_df; title_str="Best Model Performance: Accuracy vs F1-Score")
+
+Create a grouped bar chart comparing accuracy and F1 score for the best
+configuration of each model type.
+"""
 function plot_grouped_comparison(results_df::DataFrame; title_str::String="Best Model Performance: Accuracy vs F1-Score")
     best_results = combine(groupby(results_df, :Model)) do df
         df[argmax(df.Accuracy), :]
@@ -87,6 +107,12 @@ function plot_grouped_comparison(results_df::DataFrame; title_str::String="Best 
     display(p)
 end
 
+"""
+    plot_tradeoff_scatter(results_df; title_str="Trade-off: Accuracy vs Sensitivity")
+
+Create a scatter plot showing the trade-off between sensitivity and accuracy
+for each model configuration in `results_df`.
+"""
 function plot_tradeoff_scatter(results_df::DataFrame; title_str::String="Trade-off: Accuracy vs Sensitivity")
     df_plot = copy(results_df)
     df_plot.Model = string.(df_plot.Model)

@@ -29,6 +29,14 @@ LogisticClassifier = @load LogisticClassifier pkg=MLJLinearModels
 # modelSVMClassifier = SVMClassifier(kernel=LIBSVM.Kernel.RadialBasis, cost=1.0, gamma=2.0, degree=Int32(3))
 
 
+"""
+    getSVCModel(modelHyperparameters)
+
+Build a support vector classifier (SVM) model from a dictionary of
+hyperparameters.
+
+Supported keys include `:kernel`, `:gamma`, `:degree`, `:coef0` and `:cost`.
+"""
 function getSVCModel(modelHyperparameters::Dict)
 
     kernelSelected = get(modelHyperparameters, :kernel, "sigmoid")
@@ -59,15 +67,32 @@ end
 #     return modelDTClassifier = DTClassifier(max_depth=max_depth, rng=rng)
 # end
 
+"""
+    getLR()
+
+Return a default logistic regression classifier model.
+"""
 function getLR()
     return LogisticClassifier()
 end
 
+"""
+    getkNNModel(modelHyperparameters)
+
+Build a k-nearest neighbours classifier model using the `:n_neighbors`
+hyperparameter (default 3).
+"""
 function getkNNModel(modelHyperparameters::Dict)
     n_neighbors=get(modelHyperparameters, :n_neighbors, 3)
     return kNNClassifier(K=n_neighbors)
 end
 
+"""
+    getSVCProbabilisticModel(modelHyperparameters)
+
+Build a probabilistic SVM classifier (`ProbabilisticSVC`) from a dictionary of
+hyperparameters.
+"""
 function getSVCProbabilisticModel(modelHyperparameters::Dict)
 
     kernelSelected = get(modelHyperparameters, :kernel, "sigmoid")
@@ -93,12 +118,23 @@ function getSVCProbabilisticModel(modelHyperparameters::Dict)
     end
 end
 
+"""
+    getDecisionTreeModel(modelHyperparameters)
+
+Build a decision tree classifier model with basic hyperparameters such as
+`max_depth` and `min_samples_leaf`.
+"""
 function getDecisionTreeModel(modelHyperparameters::Dict)
     max_depth = get(modelHyperparameters, :max_depth, 5)
     min_samples_leaf = get(modelHyperparameters, :min_samples_leaf, 1)
     rng = get(modelHyperparameters, :rng, Random.MersenneTwister(1234))
     return DTClassifier(max_depth=max_depth, min_samples_leaf=min_samples_leaf, rng=rng)
 end
+"""
+    getDecisionTreeModelRegressor(modelHyperparameters)
+
+Build a decision tree regressor model from the supplied hyperparameters.
+"""
 function getDecisionTreeModelRegressor(modelHyperparameters::Dict)
     max_depth=get(modelHyperparameters, :max_depth, 5)
     rng=get(modelHyperparameters, :rng, Random.MersenneTwister(1234))
@@ -110,12 +146,24 @@ function getkNNModel(modelHyperparameters::Dict)
     return kNNClassifier(K=n_neighbors)
 end
 
+"""
+    getAdaBoostModel(modelHyperparameters)
+
+Build an AdaBoost stump classifier model, using `:n_estimators` and `:rng`
+hyperparameters when provided.
+"""
 function getAdaBoostModel(modelHyperparameters::Dict)
     n_iter = get(modelHyperparameters, :n_estimators, 50)
     rng = get(modelHyperparameters, :rng, Random.MersenneTwister(1))
     return AdaBoostClassifier(n_iter=n_iter, rng=rng)
 end
 
+"""
+    getRandomForestModel(modelHyperparameters)
+
+Build a random forest classifier model with hyperparameters like `:n_trees` and
+`:max_depth`.
+"""
 function getRandomForestModel(modelHyperparameters::Dict)
     n_trees = get(modelHyperparameters, :n_trees, 100)
     max_depth = get(modelHyperparameters, :max_depth, -1)  # -1 means no limit
@@ -123,6 +171,12 @@ function getRandomForestModel(modelHyperparameters::Dict)
     return RFClassifier(n_trees=n_trees, max_depth=max_depth, rng=rng)
 end
 
+"""
+    getCatBoostModel(modelHyperparameters)
+
+Build a CatBoost classifier model, exposing common hyperparameters such as
+`:iterations`, `:learning_rate` and `:depth`.
+"""
 function getCatBoostModel(modelHyperparameters::Dict)
     iterations = get(modelHyperparameters, :iterations, 100)
     learning_rate = get(modelHyperparameters, :learning_rate, 0.1)
@@ -131,10 +185,21 @@ function getCatBoostModel(modelHyperparameters::Dict)
 end
 
 
+"""
+    getPCA()
+
+Construct a PCA model that keeps 95% of the explained variance.
+"""
 function getPCA()
     return PCA(variance_ratio=0.95)
 end
 
+"""
+    getModel(modelType, modelHyperparameters)
+
+Factory function that returns an MLJ model instance corresponding to
+`modelType`, configured with the provided hyperparameters.
+"""
 function getModel(modelType::Symbol, modelHyperparameters::Dict)
 
     # @assert modelType in (:SVC, :DecisionTreeClassifier, :KNeighborsClassifier, :SVCProbabilistic) "Only SVC, DecisionTreeClassifier and KNN are supported"

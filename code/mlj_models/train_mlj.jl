@@ -3,6 +3,18 @@ using Statistics
 using MLJ
 
 
+"""
+    mljCrossValidation(modelType, modelHyperparameters, dataset, crossValidationIndices)
+
+Perform k-fold cross-validation for an MLJ model built from `modelType` and
+`modelHyperparameters`.
+
+`dataset` is a tuple `(inputs, targets)` and `crossValidationIndices` assigns a
+fold index to each pattern.
+
+The function trains and evaluates a model on each fold, accumulates a
+confusion matrix and returns mean±std for several metrics.
+"""
 function mljCrossValidation(
     modelType::Symbol, modelHyperparameters::Dict,
     dataset::Tuple{AbstractArray{<:Real,2}, AbstractArray{<:Any,1}},

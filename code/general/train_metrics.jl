@@ -3,6 +3,13 @@ include("utils_general.jl")
 
 # PRINT METRICS
 
+"""
+    printMetrics(metrics)
+
+Pretty-print the main classification metrics and confusion matrix.
+
+The input is expected to be a named tuple as returned by `confusionMatrix`.
+"""
 function printMetrics(metrics)
    accuracy, sensitivity, specificity, positive_predictive, negative_predictive_value, f_score, confusion_matrix = metrics
     println("Accuracy: ", metrics.accuracy)
@@ -18,6 +25,12 @@ end
 
 # CONFUSION MATRIX
 
+"""
+    confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{Bool,1})
+
+Compute binary classification metrics and confusion matrix from Boolean
+predictions and targets.
+"""
 function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{Bool,1})
 
     @assert length(outputs) == length(targets) "Outputs and targets must have the same length."
@@ -67,12 +80,27 @@ function confusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{
 end
 
 
+"""
+    confusionMatrix(outputs::AbstractArray{<:Real,1}, targets; threshold=0.5)
+
+Compute binary confusion matrix and metrics from real-valued scores and Boolean
+targets by thresholding the scores.
+"""
 function confusionMatrix(outputs::AbstractArray{<:Real,1},targets::AbstractArray{Bool,1}; threshold::Real=0.5)
     realToBoolean(outputs, threshold) = outputs.>threshold
     outputsBoolean = confusionMatrix(realToBoolean(outputs, threshold), targets)
 end
 
 
+"""
+    confusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}; mode=:macro)
+
+Compute multiclass confusion matrix and aggregate metrics for one-hot encoded
+predictions and targets.
+
+`mode` controls macro-averaged (unweighted) or support-weighted averaging of
+per-class metrics.
+"""
 function confusionMatrix(outputs::AbstractArray{Bool, 2}, targets::AbstractArray{Bool, 2}; mode::Symbol=:macro)
 
     num_columns_out = size(outputs, 2)
@@ -151,6 +179,12 @@ function confusionMatrix(outputs::AbstractArray{Bool, 2}, targets::AbstractArray
     )
 end
 
+"""
+    confusionMatrix(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}; threshold=0.5, weighted=true)
+
+Compute multiclass confusion matrix and metrics from real-valued score
+matrices, thresholding them to Booleans before evaluation.
+"""
 function confusionMatrix(outputs::AbstractArray{<:Real,2},targets::AbstractArray{Bool,2}; threshold::Real=0.5, weighted::Bool=true)
     realToBoolean(outputs::AbstractArray{<:Real,2}, threshold::Real) = outputs.>threshold
     mode = weighted ? :weighted : :macro
@@ -158,6 +192,12 @@ function confusionMatrix(outputs::AbstractArray{<:Real,2},targets::AbstractArray
 end
 
 
+"""
+    confusionMatrix(outputs, targets, classes; weighted=true)
+
+Compute multiclass confusion matrix and metrics for arbitrary labels, given an
+explicit list of classes.
+"""
 function confusionMatrix(outputs::AbstractArray{<:Any,1}, targets::AbstractArray{<:Any,1}, classes::AbstractArray{<:Any,1}; weighted::Bool=true)
 
     @assert all([in(target, unique(classes)) for target in targets]) "Not all labels in targets are present in classes.";
@@ -172,6 +212,12 @@ function confusionMatrix(outputs::AbstractArray{<:Any,1}, targets::AbstractArray
 end;
 
 
+"""
+    confusionMatrix(outputs, targets; weighted=true)
+
+Compute multiclass confusion matrix and metrics for arbitrary labels, inferring
+the set of classes from `outputs` and `targets`.
+"""
 function confusionMatrix(outputs::AbstractArray{<:Any,1}, targets::AbstractArray{<:Any,1}; weighted::Bool=true)
     classes = unique(vcat(targets, outputs))
     confusionMatrix(outputs, targets, classes, weighted=weighted)
@@ -180,17 +226,35 @@ end
 
 ## PRINT CONFUSION MATRIX
 
+"""
+    printConfusionMatrix(outputs::AbstractArray{Bool,1}, targets::AbstractArray{Bool,1})
+
+Compute and print binary confusion matrix and metrics for Boolean outputs and
+targets.
+"""
 function printConfusionMatrix(outputs::AbstractArray{Bool,1},targets::AbstractArray{Bool,1})
         metrics = confusionMatrix(outputs, targets)
         printMetrics(metrics)
 end
 
+"""
+    printConfusionMatrix(outputs::AbstractArray{<:Real,1}, targets::AbstractArray{Bool,1}; threshold=0.5)
+
+Threshold real-valued scores and print the resulting binary confusion matrix
+and metrics.
+"""
 function printConfusionMatrix(outputs::AbstractArray{<:Real,1},targets::AbstractArray{Bool,1}; threshold::Real=0.5)
     metrics = confusionMatrix(outputs, targets)
     printMetrics(metrics)
 end
 
 
+"""
+    printConfusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}; weighted=true)
+
+Print multiclass confusion matrix and metrics for one-hot encoded Boolean
+outputs and targets.
+"""
 function printConfusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractArray{Bool,2}; weighted::Bool=true)
 
     mode = weighted ? :weighted : :macro
@@ -199,17 +263,35 @@ function printConfusionMatrix(outputs::AbstractArray{Bool,2}, targets::AbstractA
     printMetrics(metrics)
 end
 
+"""
+    printConfusionMatrix(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}; weighted=true)
+
+Threshold real-valued score matrices and print the resulting multiclass
+confusion matrix and metrics.
+"""
 function printConfusionMatrix(outputs::AbstractArray{<:Real,2}, targets::AbstractArray{Bool,2}; weighted::Bool=true)
     mode = weighted ? :weighted : :macro
     metrics = confusionMatrix(outputs, targets, weighted=weighted)
     printMetrics(metrics)
 end
 
+"""
+    printConfusionMatrix(outputs, targets, classes; weighted=true)
+
+Print confusion matrix and metrics for arbitrary labels and an explicit list of
+classes.
+"""
 function printConfusionMatrix(outputs::AbstractArray{<:Any,1}, targets::AbstractArray{<:Any,1}, classes::AbstractArray{<:Any,1}; weighted::Bool=true)
     metrics = confusionMatrix(outputs, targets, classes, weighted=weighted)
     printMetrics(metrics)
 end
 
+"""
+    printConfusionMatrix(outputs, targets; weighted=true)
+
+Print confusion matrix and metrics for arbitrary labels, inferring the set of
+classes automatically.
+"""
 function printConfusionMatrix(outputs::AbstractArray{<:Any,1}, targets::AbstractArray{<:Any,1}; weighted::Bool=true)
     metrics = confusionMatrix(outputs, targets, weighted=weighted)
     printMetrics(metrics)
